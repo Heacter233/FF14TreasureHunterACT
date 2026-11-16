@@ -87,12 +87,13 @@
    <ACT安装目录>\Plugins\FF14TreasureHunterACT.dll
    ```
    > 整合包（如呆萌）通常在 `<ACT目录>\ACT.DieMoe\Plugins\`
-   html放到(可不下，但需要从服务器更新):
+
+4. html放到(可不下，但需要从服务器更新):
    ```
    %APPDATA%\FF14TreasureHunter\web 
    ```
-4. 启动 ACT → 插件标签页 → 右键 → 启用「挖宝会计」
-5. 首次运行会自动创建配置与数据库：
+5. 启动 ACT → 插件标签页 → 右键 → 启用「挖宝会计」
+6. 首次运行会自动创建配置与数据库：
    ```
    %APPDATA%\FF14TreasureHunter\
      ├─ config\settings.json     ← 配置
@@ -121,7 +122,11 @@
 - 设置页：`http://127.0.0.1:8765/settings.html`
 
 端口可在设置页修改（默认 8765，改完需重载插件）。
-
+悬浮窗可以使用ACT自带OverlayPlugin插件，预设：自定义悬浮窗；类型：数据统计。
+悬浮窗地址使用：
+ ```
+ http://127.0.0.1:8765/overlay.html?HOST_PORT=ws://127.0.0.1/fake/
+ ```
 ---
 
 ## 配置
