@@ -62,9 +62,37 @@ dotnet build _ci/act-stub/ActStub.csproj -c Release
 msbuild FF14TreasureHunterACT.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 `
   /p:ActDir="_ci\act-stub\bin\Release\net472"
 
-# 3. 校验引用身份
-#    产物应引用 Version=3.8.5.288, PublicKeyToken=a946b61e93d97868
+# 3. 校验引用身份（CI 用的同一个脚本）
+powershell -ExecutionPolicy Bypass -File .\_ci\verify-ref.ps1
 ```
 
 > 本地正常开发**不需要**它 —— 直接 `/p:ActDir` 指向你安装的 ACT 目录即可，
 > 编译结果与用桩编译在功能上等价（因为引用身份相同）。
+
+---
+
+## `verify-ref.ps1` —— 产物校验脚本
+
+CI 与本地共用同一份实现，检查两件事：
+
+1. 产物 DLL 存在且是有效程序集
+2. 该 DLL 对 `Advanced Combat Tracker` 的引用带正确的强名称公钥标记
+   （`a946b61e93d97868`）——否则在真实 ACT 中会绑定失败
+
+### ⚠️ 不要改成 `ReflectionOnlyLoadFrom`
+
+```powershell
+# 错误：PowerShell 7（.NET Core）会抛
+#   "ReflectionOnly loading is not supported on this platform."
+[System.Reflection.Assembly]::ReflectionOnlyLoadFrom($path)
+```
+
+GitHub Actions 的 `shell: pwsh` 是 PowerShell 7，而 `ReflectionOnlyLoadFrom`
+只在 .NET Framework（Windows PowerShell 5.1）里可用。
+
+脚本改用 `Assembly.LoadFrom()` + `GetReferencedAssemblies()`：
+读取引用表**不需要解析依赖**，也不会执行目标程序集的任何代码，
+在 PS 5.1 和 PS 7 上都能工作。
+
+> 脚本文件本身保存为 **UTF-8 with BOM**，这样 Windows PowerShell 5.1
+> 也能正确读取其中的中文（5.1 无 BOM 时会按 ANSI 解析导致乱码/语法错误）。
