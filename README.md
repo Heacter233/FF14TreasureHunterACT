@@ -83,12 +83,17 @@
 ## 安装
 
 1. 确认已安装 ACT，并且**游戏日志记录**已开启
-2. 下载 `FF14TreasureHunterACT.dll`,`Web文件`（单独下载或整合）
+2. 下载 `FF14TreasureHunterACT.dll`,`Web文件（web-pages.zip）`,`依赖文件（dependency.zip）`（单独下载或整合）
 3. dll放到 ACT 的插件目录：
    ```
    <ACT安装目录>\Plugins\FF14TreasureHunterACT.dll
    ```
    > 整合包（如呆萌）通常在 `<ACT目录>\ACT.DieMoe\Plugins\`
+
+4. 安装时注意需要在对应依赖文件`dependency.zip`整体解压存放处存放依赖文件
+
+   > 整合包（呆萌）通常在 `<ACT目录>\ACT.DieMoe\DLibs`
+   > 整合包（国服整合）通常在 `<ACT目录>\ACT国服整合\CafeStore`
 
 4. html放到(可不下，但需要从服务器更新):
    ```
@@ -105,6 +110,8 @@
 
 > ⚠️ **不要装在云同步目录里**（如 OneDrive 托管的「我的文档」）。
 > 云同步可能把更新后的 DLL 还原成旧版本，导致"更新成功但版本没变"。
+
+或直接下载`Full.setup.package（版本）.zip`按照指引安装。
 
 ---
 
