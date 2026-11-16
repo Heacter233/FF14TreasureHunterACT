@@ -52,6 +52,8 @@
 - 分段后发送默语提示
 - Windows 通知
 
+### 常见问题
+- [QA文档](docs/images/ACT挖宝会计插件帮助QA.docx)
 ---
 
 ## 界面
