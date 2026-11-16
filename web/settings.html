@@ -1,0 +1,2795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>挖宝会计 - 设置</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #1e1e1e;
+    color: #d0d0d0;
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  .app { display: flex; height: 100vh; }
+
+  /* ---- 侧边栏 ---- */
+  .sidebar {
+    width: 200px;
+    background: #252525;
+    border-right: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    padding: 16px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #f0d080;
+    border-bottom: 1px solid #333;
+  }
+  .sidebar nav {
+    padding: 8px 0;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .sidebar nav a {
+    display: block;
+    padding: 10px 18px;
+    color: #c0c0c0;
+    text-decoration: none;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    font-size: 13px;
+  }
+  .sidebar nav a:hover { background: #2a2a2a; }
+  .sidebar nav a.active {
+    background: #2f2f2a;
+    color: #f0d080;
+    border-left-color: #c0a050;
+    font-weight: bold;
+  }
+
+  /* ---- 主区 ---- */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  main header {
+    padding: 14px 24px;
+    border-bottom: 1px solid #333;
+    background: #252525;
+  }
+  main header h1 {
+    color: #f0d080;
+    font-size: 18px;
+    font-weight: bold;
+  }
+  main header .subtitle {
+    color: #808080;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  #content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+
+  /* ---- 底部按钮 ---- */
+  main footer {
+    padding: 12px 24px;
+    border-top: 1px solid #333;
+    background: #252525;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  main footer button {
+    padding: 7px 18px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  main footer button:hover { background: #4a4a4a; }
+  main footer button.primary {
+    background: #5a5a3a;
+    color: #f0d080;
+    border-color: #6a6a4a;
+    font-weight: bold;
+  }
+  main footer button.primary:hover { background: #6a6a4a; }
+  main footer button:disabled {
+    background: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+  }
+  #saveStatus {
+    color: #90d090;
+    font-size: 13px;
+    margin-left: auto;
+  }
+  #saveStatus.error { color: #e08080; }
+  #saveStatus.dirty  { color: #f0d080; }
+
+  /* ---- 表单 ---- */
+  .group {
+    background: #252525;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border: 1px solid #333;
+  }
+  .group h2 {
+    color: #c0a050;
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3a3a3a;
+    font-weight: bold;
+  }
+  .field {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dashed #2a2a2a;
+  }
+  .field:last-child { border-bottom: none; }
+  .field > label {
+    color: #c0c0c0;
+    font-size: 13px;
+  }
+  .field .control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .field .hint {
+    color: #808080;
+    font-size: 12px;
+    margin-top: 3px;
+  }
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select {
+    background: #1e1e1e;
+    color: #f0d080;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    min-width: 180px;
+  }
+  .field input[type="text"]:focus,
+  .field input[type="number"]:focus {
+    outline: none;
+    border-color: #6a6a4a;
+  }
+  .field input[type="number"] { width: 100px; min-width: 100px; }
+
+  /* 自定义 checkbox */
+  .checkbox-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-wrap input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #1e1e1e;
+    border: 2px solid #4a4a4a;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .checkbox-wrap input[type="checkbox"]:hover {
+    border-color: #6a6a4a;
+  }
+  .checkbox-wrap input[type="checkbox"]:checked {
+    background: #5a5a3a;
+    border-color: #c0a050;
+  }
+  .checkbox-wrap input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px; top: 0px;
+    width: 5px; height: 10px;
+    border: solid #f0d080;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .placeholder {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 15px;
+  }
+  .placeholder .icon {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  /* loading */
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #808080;
+  }
+  /* ==================== 地图管理 ==================== */
+  .map-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 16px;
+    height: 100%;
+    min-height: 480px;
+  }
+  .map-list {
+    background: #252525;
+    border-radius: 6px;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .map-list-header { padding: 10px; border-bottom: 1px solid #333; }
+  .map-list-header button {
+    width: 100%;
+    padding: 6px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .map-list-header button:hover { background: #4a4a4a; }
+  .map-list-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .map-list-item {
+    padding: 8px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: #c0c0c0;
+    font-size: 13px;
+    margin-bottom: 2px;
+    word-break: break-all;
+  }
+  .map-list-item:hover { background: #2f2f2f; }
+  .map-list-item.active {
+    background: #3d3d2a;
+    color: #f0d080;
+    font-weight: bold;
+  }
+  .map-list-item .disabled-tag {
+    color: #666;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+
+  .map-detail {
+    background: #252525;
+    border-radius: 6px;
+    border: 1px solid #333;
+    padding: 16px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .map-detail h3 {
+    color: #c0a050;
+    font-size: 14px;
+    margin: 16px 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #3a3a3a;
+    font-weight: bold;
+  }
+  .map-detail h3:first-child { margin-top: 0; }
+
+  .map-detail .basic-grid {
+    display: grid;
+    grid-template-columns: 120px 1fr 120px 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+  .map-detail .basic-grid > label {
+    color: #c0c0c0;
+    font-size: 13px;
+  }
+  .map-detail .basic-grid input[type="text"] {
+    background: #1e1e1e;
+    color: #f0d080;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+  }
+  .map-detail .basic-grid input[type="text"]:focus {
+    outline: none;
+    border-color: #6a6a4a;
+  }
+
+  .row-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .row-table th {
+    text-align: left;
+    padding: 6px 8px;
+    color: #a09070;
+    font-size: 12px;
+    font-weight: normal;
+    border-bottom: 1px solid #3a3a3a;
+  }
+  .row-table td { padding: 4px 8px; }
+  .row-table input[type="text"],
+  .row-table input[type="number"] {
+    background: #1e1e1e;
+    color: #d0d0d0;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+  }
+  .row-table input:focus {
+    outline: none;
+    border-color: #6a6a4a;
+  }
+  .row-table .btn-del {
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: 1px solid #5a3a3a;
+    color: #e08080;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+  }
+  .row-table .btn-del:hover { background: #5a3a3a; }
+
+  .add-row-btn {
+    margin-top: 6px;
+    padding: 5px 14px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .add-row-btn:hover { background: #4a4a4a; }
+
+  .map-actions {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #3a3a3a;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .map-actions button {
+    padding: 7px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+  }
+  .map-actions button:hover { background: #4a4a4a; }
+  .map-actions .btn-primary {
+    background: #5a5a3a;
+    color: #f0d080;
+    border: 1px solid #6a6a4a;
+    font-weight: bold;
+  }
+  .map-actions .btn-primary:hover { background: #6a6a4a; }
+  .map-actions .btn-primary:disabled {
+    background: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+  }
+  .map-actions .btn-danger {
+    background: #4a2a2a;
+    color: #e08080;
+    border: 1px solid #5a3a3a;
+  }
+  .map-actions .btn-danger:hover { background: #5a3a3a; }
+  .map-actions #mapStatus {
+    margin-left: auto;
+    font-size: 13px;
+  }
+
+  .map-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 14px;
+  }
+  /* ==================== 规则页（预测/触发器通用） ==================== */
+  .rule-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px;
+    min-height: 480px;
+  }
+  .rule-list {
+    background: #252525;
+    border-radius: 6px;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .rule-list-header { padding: 10px; border-bottom: 1px solid #333; }
+  .rule-list-header button {
+    width: 100%; padding: 6px;
+    background: #3d3d3d; color: #d0d0d0;
+    border: 1px solid #4a4a4a; border-radius: 3px;
+    cursor: pointer; font-size: 13px; font-family: inherit;
+  }
+  .rule-list-header button:hover { background: #4a4a4a; }
+  .rule-list-items { flex: 1; overflow-y: auto; padding: 6px; }
+  .rule-list-item {
+    padding: 8px 12px; border-radius: 3px;
+    cursor: pointer; color: #c0c0c0; font-size: 13px;
+    margin-bottom: 2px; word-break: break-all;
+  }
+  .rule-list-item:hover { background: #2f2f2f; }
+  .rule-list-item.active {
+    background: #3d3d2a; color: #f0d080; font-weight: bold;
+  }
+  .rule-list-item .tag {
+    color: #666; font-size: 11px; margin-left: 6px;
+  }
+
+  .rule-detail {
+    background: #252525;
+    border-radius: 6px;
+    border: 1px solid #333;
+    padding: 16px 20px;
+    overflow-y: auto;
+  }
+  .rule-detail h3 {
+    color: #c0a050; font-size: 14px;
+    margin: 18px 0 8px 0; padding-bottom: 6px;
+    border-bottom: 1px solid #3a3a3a; font-weight: bold;
+  }
+  .rule-detail h3:first-child { margin-top: 0; }
+
+  .rule-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 12px;
+    align-items: center;
+  }
+  .rule-grid > label { color: #c0c0c0; font-size: 13px; }
+  .rule-grid input[type="text"],
+  .rule-grid input[type="number"],
+  .rule-grid select {
+    background: #1e1e1e; color: #f0d080;
+    border: 1px solid #3a3a3a; border-radius: 3px;
+    padding: 5px 10px; font-size: 13px;
+    font-family: inherit; width: 100%;
+  }
+  .rule-grid input:focus, .rule-grid select:focus {
+    outline: none; border-color: #6a6a4a;
+  }
+  .rule-grid .hint {
+    grid-column: 2; color: #808080;
+    font-size: 12px; margin-top: -4px;
+  }
+
+  .action-row {
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: #232323;
+  }
+  .action-row .action-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .action-row .action-header .num {
+    color: #a09070; font-size: 12px;
+  }
+  .action-row .btn-del {
+    margin-left: auto;
+    width: 26px; height: 26px;
+    background: transparent; border: 1px solid #5a3a3a;
+    color: #e08080; border-radius: 3px; cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 0;
+  }
+  .action-row .btn-del:hover { background: #5a3a3a; }
+
+  .rule-actions {
+    margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid #3a3a3a;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .rule-actions button {
+    padding: 7px 20px; border-radius: 4px; cursor: pointer;
+    font-size: 13px; font-family: inherit;
+    background: #3d3d3d; color: #d0d0d0; border: 1px solid #4a4a4a;
+  }
+  .rule-actions button:hover { background: #4a4a4a; }
+  .rule-actions .btn-primary {
+    background: #5a5a3a; color: #f0d080;
+    border: 1px solid #6a6a4a; font-weight: bold;
+  }
+  .rule-actions .btn-primary:hover { background: #6a6a4a; }
+  .rule-actions .btn-danger {
+    background: #4a2a2a; color: #e08080; border: 1px solid #5a3a3a;
+  }
+  .rule-actions .btn-danger:hover { background: #5a3a3a; }
+  .rule-actions #ruleStatus { margin-left: auto; font-size: 13px; }
+
+  /* ==================== 导入导出 ==================== */
+  .ie-group {
+    background: #252525; border: 1px solid #333;
+    border-radius: 6px; padding: 20px 24px; margin-bottom: 16px;
+  }
+  .ie-group h2 {
+    color: #c0a050; font-size: 14px; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid #3a3a3a; font-weight: bold;
+  }
+  .ie-group p { color: #a0a0a0; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
+  .ie-group button {
+    padding: 8px 22px; background: #3d3d3d; color: #d0d0d0;
+    border: 1px solid #4a4a4a; border-radius: 4px;
+    cursor: pointer; font-size: 13px; font-family: inherit;
+  }
+  .ie-group button:hover { background: #4a4a4a; }
+  .ie-group button.primary {
+    background: #5a5a3a; color: #f0d080;
+    border-color: #6a6a4a; font-weight: bold;
+  }
+  .ie-group button.primary:hover { background: #6a6a4a; }
+  .ie-status { margin-top: 12px; font-size: 13px; }
+  .ie-status.ok  { color: #90d090; }
+  .ie-status.err { color: #e08080; }
+    /* ==================== 发布管理 ==================== */
+  .pub-section {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .pub-section h2 {
+    color: #c0a050;
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3a3a3a;
+    font-weight: bold;
+  }
+  .pub-list { max-height: 280px; overflow-y: auto; }
+  .pub-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #2a2a2a;
+    gap: 10px;
+  }
+  .pub-row:last-child { border-bottom: none; }
+  .pub-row:hover { background: #2a2a2a; }
+  .pub-row .pub-name {
+    flex: 1;
+    color: #d0d0d0;
+    font-size: 13px;
+    word-break: break-all;
+  }
+  .pub-row .pub-id {
+    color: #808080;
+    font-size: 12px;
+    font-family: Consolas, monospace;
+    margin-left: 8px;
+  }
+  .pub-row .btn-edit-id {
+    padding: 3px 10px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .pub-row .btn-edit-id:hover { background: #4a4a4a; }
+
+  .pub-version-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pub-version-row input {
+    background: #1e1e1e;
+    color: #f0d080;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-family: Consolas, monospace;
+    width: 140px;
+  }
+  .pub-version-row button {
+    padding: 5px 14px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .pub-version-row button:hover { background: #4a4a4a; }
+
+  .pub-preview-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .pub-preview-tabs .ptab {
+    padding: 5px 14px;
+    background: #2a2a2a;
+    color: #a09070;
+    border: 1px solid #3a3a3a;
+    border-bottom: none;
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .pub-preview-tabs .ptab.active {
+    background: #3d3d2a;
+    color: #f0d080;
+    border-color: #6a6a4a;
+  }
+  .pub-preview-text {
+    width: 100%;
+    height: 220px;
+    background: #1a1a1a;
+    color: #c0d0a0;
+    border: 1px solid #3a3a3a;
+    border-radius: 0 3px 3px 3px;
+    padding: 10px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    resize: vertical;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .pub-export-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .pub-export-row button {
+    padding: 8px 22px;
+    background: #3d3d3d;
+    color: #d0d0d0;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .pub-export-row button:hover { background: #4a4a4a; }
+  .pub-export-row button.primary {
+    background: #5a5a3a;
+    color: #f0d080;
+    border-color: #6a6a4a;
+    font-weight: bold;
+  }
+  .pub-export-row button.primary:hover { background: #6a6a4a; }
+  .pub-export-row button:disabled {
+    background: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .pub-status {
+    margin-top: 10px;
+    font-size: 13px;
+    min-height: 20px;
+  }
+  .pub-status.ok  { color: #90d090; }
+  .pub-status.err { color: #e08080; }
+  .pub-status.info { color: #f0d080; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="brand">⚙️ 挖宝会计</div>
+    <nav id="nav">
+      <a data-tab="general" class="active">通用</a>
+      <a data-tab="detection">识别规则</a>
+      <a data-tab="postnamazu">鲶鱼精</a>
+      <a data-tab="notification">通知</a>
+      <a data-tab="segment">分段与自动发送</a>
+      <a data-tab="maps">地图管理</a>
+      <a data-tab="predictions">预测规则</a>
+      <a data-tab="rules">触发器规则</a>
+      <a data-tab="ie">导入导出</a>
+      <a data-tab="publish" style="border-top:1px solid #333;margin-top:8px;padding-top:14px">📤 发布管理</a>
+    </nav>
+  </aside>
+
+  <!-- 主区 -->
+  <main>
+    <header>
+      <h1 id="pageTitle">通用设置</h1>
+      <div class="subtitle" id="pageSubtitle"></div>
+    </header>
+    <section id="content">
+      <div class="loading">正在加载配置...</div>
+    </section>
+    <footer>
+      <button id="btnSave" class="primary" disabled>保存本页</button>
+      <button id="btnReload">重载全部配置</button>
+      <span id="saveStatus"></span>
+    </footer>
+  </main>
+
+</div>
+
+<script>
+(function() {
+  // ============ 状态 ============
+  const state = {
+    config: {},              // 全部配置
+    currentTab: 'general',
+    dirty: false,
+    loading: true,
+    savedConfig: {},         // 保存时的快照，用于比较
+
+    // 地图管理
+    mapsList: [],            // 全部地图（服务端数据）
+    currentMapName: '',      // 当前编辑的地图名
+    editingMap: null,        // 编辑中的地图副本
+    mapDirty: false,         // 地图是否有未保存修改
+    mapsLoaded: false,       // 是否已加载地图列表
+
+    // 预测规则
+    predictionsList: [],
+    currentPredId: '',
+    editingPred: null,
+    predDirty: false,
+    predsLoaded: false,
+
+    // 触发器规则
+    rulesList: [],
+    currentRuleId: '',
+    editingRule: null,
+    ruleDirty: false,
+    rulesLoaded: false,
+
+    // 发布管理
+    publishMaps: [],
+    publishPreds: [],
+    publishLoaded: false,
+    publishPreview: null,
+    dataVersion: '',
+    publishPreviewTab: 'maps'
+  };
+  const API = '';  // 同源，空字符串即可
+
+  // 标签页元数据
+  const TABS = {
+    general:      { title: '通用设置',         subtitle: '界面、单位、悬浮窗' },
+    detection:    { title: '识别规则',         subtitle: '决定能否统计到地图完成与魔纹' },
+    postnamazu:   { title: '鲶鱼精邮差',       subtitle: '消息发送通道' },
+    notification: { title: 'Windows 通知',     subtitle: '系统通知开关' },
+    segment:      { title: '分段与自动发送',   subtitle: '自动分段触发条件 + 自动发送' },
+    maps:         { title: '地图管理',         subtitle: '地图、物品、层级' },
+    predictions:  { title: '预测规则',         subtitle: '预判宝物库结果' },
+    rules:        { title: '触发器规则',       subtitle: '高级自动化' },
+    ie:           { title: '导入导出',         subtitle: '配置备份与恢复' },
+    publish:      { title: '发布管理',         subtitle: '导出服务器数据包（维护者使用）' }
+  };
+
+
+  // ============ 工具函数 ============
+
+  function getConfig(path, defaultValue) {
+    const keys = path.split('.');
+    let cur = state.config;
+    for (const k of keys) {
+      if (cur == null || typeof cur !== 'object') return defaultValue;
+      cur = cur[k];
+    }
+    return cur == null ? defaultValue : cur;
+  }
+
+  function setConfig(path, value) {
+    const keys = path.split('.');
+    let cur = state.config;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (cur[keys[i]] == null || typeof cur[keys[i]] !== 'object') cur[keys[i]] = {};
+      cur = cur[keys[i]];
+    }
+    cur[keys[keys.length - 1]] = value;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ============ 数据加载 ============
+  function loadConfig() {
+    state.loading = true;
+    render();
+    fetch(API + '/api/config/all')
+      .then(r => r.json())
+      .then(data => {
+        state.config = data || {};
+        state.savedConfig = JSON.parse(JSON.stringify(data || {}));
+        state.dirty = false;
+        state.loading = false;
+        render();
+      })
+      .catch(err => {
+        state.loading = false;
+        document.getElementById('content').innerHTML =
+          '<div class="placeholder"><span class="icon">⚠️</span>加载失败：' +
+          escapeHtml(err.message) + '</div>';
+      });
+  }
+
+  // ============ 渲染 ============
+  function render() {
+    if (state.loading) return;
+
+    const meta = TABS[state.currentTab];
+    document.getElementById('pageTitle').textContent = meta.title;
+    document.getElementById('pageSubtitle').textContent = meta.subtitle;
+
+    // 侧边栏
+    document.querySelectorAll('#nav a').forEach(a => {
+      a.classList.toggle('active', a.dataset.tab === state.currentTab);
+    });
+
+    // 内容
+    const content = document.getElementById('content');
+    switch (state.currentTab) {
+      case 'general':      content.innerHTML = renderGeneral(); break;
+      case 'detection':    content.innerHTML = renderDetection(); bindDetectionEvents(); break;
+      case 'postnamazu':   content.innerHTML = renderPostnamazu(); break;
+      case 'notification': content.innerHTML = renderNotification(); break;
+      case 'segment':      content.innerHTML = renderSegment(); break;
+      case 'maps':         content.innerHTML = renderMaps(); bindMapEvents(); break;
+      case 'predictions':  content.innerHTML = renderPredictions(); bindPredEvents(); break;
+      case 'rules':        content.innerHTML = renderRules(); bindRuleEvents(); break;
+      case 'ie':           content.innerHTML = renderIE(); bindIEEvents(); break;
+      case 'publish':      content.innerHTML = renderPublish(); bindPublishEvents(); break;
+    }
+
+    // 绑定输入事件
+    bindInputEvents();
+
+    // 底部状态
+    updateSaveButton();
+  }
+
+  function renderPlaceholder(icon, text) {
+    return '<div class="placeholder"><span class="icon">' + icon + '</span>' +
+           escapeHtml(text) + '</div>';
+  }
+  // ==================== 地图管理 ====================
+
+  function renderMaps() {
+    if (!state.mapsLoaded) {
+      loadMaps();
+      return '<div class="loading">正在加载地图...</div>';
+    }
+
+    let listHtml = state.mapsList.map(m => {
+      const active = m.name === state.currentMapName ? ' active' : '';
+      const disabled = m.enabled ? '' : ' <span class="disabled-tag">(禁用)</span>';
+      return '<div class="map-list-item' + active + '" data-map="' +
+             escapeHtml(m.name) + '">' + escapeHtml(m.name) + disabled + '</div>';
+    }).join('');
+
+    let detailHtml;
+    if (!state.editingMap) {
+      detailHtml = '<div class="map-empty">← 从左侧选择一个地图，或点击"+ 新建地图"</div>';
+    } else {
+      detailHtml = renderMapDetail(state.editingMap);
+    }
+
+    return '<div class="map-layout">' +
+      '<aside class="map-list">' +
+        '<div class="map-list-header">' +
+          '<button id="btnNewMap">+ 新建地图</button>' +
+        '</div>' +
+        '<div class="map-list-items">' +
+          (listHtml || '<div class="map-empty" style="padding:20px;font-size:12px">暂无地图</div>') +
+        '</div>' +
+      '</aside>' +
+      '<section class="map-detail">' + detailHtml + '</section>' +
+    '</div>';
+  }
+
+  function renderMapDetail(m) {
+    let html = '<h3>基本信息</h3>';
+    html += '<div class="basic-grid">';
+    html += '<label>地图名（简写）</label>';
+    html += '<input type="text" data-field="name" value="' + escapeHtml(m.name || '') + '">';
+    html += '<label>地图名（全称）</label>';
+    html += '<input type="text" data-field="map_item_prefix" value="' + escapeHtml(m.map_item_prefix || '') + '">';
+    html += '<label>副本名称</label>';
+    html += '<input type="text" data-field="map_name" value="' + escapeHtml(m.map_name || '') + '">';
+    html += '<label>启用</label>';
+    html += '<label class="checkbox-wrap"><input type="checkbox" data-field="enabled" ' +
+            (m.enabled ? 'checked' : '') + '><span>' + (m.enabled ? '已启用' : '已禁用') + '</span></label>';
+    html += '</div>';
+
+    // 物品列表
+    html += '<h3>物品列表</h3>';
+    html += '<table class="row-table" data-table="items">';
+    html += '<thead><tr><th style="width:40%">物品名</th><th style="width:25%">市价</th>' +
+            '<th style="width:25%">加工资</th><th style="width:50px"></th></tr></thead>';
+    html += '<tbody>';
+    (m.items || []).forEach((it, i) => {
+      html += '<tr>' +
+        '<td><input type="text" data-idx="' + i + '" data-col="name" value="' + escapeHtml(it.name || '') + '"></td>' +
+        '<td><input type="number" data-idx="' + i + '" data-col="price" value="' + (it.price || 0) + '"></td>' +
+        '<td><input type="number" data-idx="' + i + '" data-col="bonus" value="' + (it.bonus || 0) + '"></td>' +
+        '<td><button class="btn-del" data-del-item="' + i + '" title="删除">×</button></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<button class="add-row-btn" id="btnAddItem">+ 添加物品</button>';
+
+    // 层级列表
+    html += '<h3>层级列表</h3>';
+    html += '<table class="row-table" data-table="layers">';
+    html += '<thead><tr><th style="width:50%">关键词（多个用逗号分隔）</th>' +
+            '<th style="width:40%">缩写/昵称</th><th style="width:50px"></th></tr></thead>';
+    html += '<tbody>';
+    (m.layers || []).forEach((ly, i) => {
+      html += '<tr>' +
+        '<td><input type="text" data-idx="' + i + '" data-col="keyword" value="' + escapeHtml(ly.keyword || '') + '"></td>' +
+        '<td><input type="text" data-idx="' + i + '" data-col="nickname" value="' + escapeHtml(ly.nickname || '') + '"></td>' +
+        '<td><button class="btn-del" data-del-layer="' + i + '" title="删除">×</button></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<button class="add-row-btn" id="btnAddLayer">+ 添加层级</button>';
+
+    // 操作按钮
+    html += '<div class="map-actions">';
+    html += '<button class="btn-primary" id="btnSaveMap">保存本地图</button>';
+    html += '<button class="btn-danger" id="btnDeleteMap">删除本地图</button>';
+    html += '<button id="btnResetMap">放弃修改</button>';
+    html += '<span id="mapStatus"></span>';
+    html += '</div>';
+
+    return html;
+  }
+
+  function loadMaps() {
+    fetch(API + '/api/maps/all')
+      .then(r => r.json())
+      .then(data => {
+        state.mapsList = data.maps || [];
+        state.mapsLoaded = true;
+        if (state.mapsList.length > 0 && !state.currentMapName) {
+          state.currentMapName = state.mapsList[0].name;
+          state.editingMap = JSON.parse(JSON.stringify(state.mapsList[0]));
+        }
+        render();
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML =
+          '<div class="placeholder"><span class="icon">⚠️</span>加载地图失败：' +
+          escapeHtml(err.message) + '</div>';
+      });
+  }
+
+  function selectMap(name) {
+    if (state.mapDirty) {
+      if (!confirm('当前地图有未保存的修改，切换会丢失，确定继续？')) return;
+    }
+    const m = state.mapsList.find(x => x.name === name);
+    if (!m) return;
+    state.currentMapName = name;
+    state.editingMap = JSON.parse(JSON.stringify(m));
+    state.mapDirty = false;
+    render();
+  }
+
+  function newMap() {
+    if (state.mapDirty) {
+      if (!confirm('当前地图有未保存的修改，新建会丢失，确定继续？')) return;
+    }
+    const newName = '新地图' + (state.mapsList.length + 1);
+    state.currentMapName = '';
+    state.editingMap = {
+      name: newName,
+      map_item_prefix: '',
+      map_name: '',
+      enabled: true,
+      items: [],
+      layers: []
+    };
+    state.mapDirty = true;
+    render();
+    setTimeout(() => {
+      const el = document.querySelector('input[data-field="name"]');
+      if (el) { el.focus(); el.select(); }
+    }, 100);
+  }
+
+  function bindMapEvents() {
+    if (state.currentTab !== 'maps') return;
+
+    document.querySelectorAll('.map-list-item').forEach(el => {
+      el.addEventListener('click', () => selectMap(el.dataset.map));
+    });
+
+    const btnNew = document.getElementById('btnNewMap');
+    if (btnNew) btnNew.addEventListener('click', newMap);
+
+    if (!state.editingMap) return;
+    const m = state.editingMap;
+
+    document.querySelectorAll('.map-detail [data-field]').forEach(el => {
+      const field = el.dataset.field;
+      const handler = () => {
+        if (el.type === 'checkbox') m[field] = el.checked;
+        else m[field] = el.value;
+        state.mapDirty = true;
+        updateMapStatus();
+        if (field === 'enabled') {
+          const span = el.parentElement.querySelector('span');
+          if (span) span.textContent = el.checked ? '已启用' : '已禁用';
+        }
+      };
+      el.addEventListener('change', handler);
+      if (el.type !== 'checkbox') el.addEventListener('input', handler);
+    });
+
+    document.querySelectorAll('table[data-table="items"] input').forEach(el => {
+      el.addEventListener('input', () => {
+        const idx = parseInt(el.dataset.idx);
+        const col = el.dataset.col;
+        if (!m.items[idx]) return;
+        m.items[idx][col] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+        state.mapDirty = true;
+        updateMapStatus();
+      });
+    });
+
+    document.querySelectorAll('table[data-table="layers"] input').forEach(el => {
+      el.addEventListener('input', () => {
+        const idx = parseInt(el.dataset.idx);
+        const col = el.dataset.col;
+        if (!m.layers[idx]) return;
+        m.layers[idx][col] = el.value;
+        state.mapDirty = true;
+        updateMapStatus();
+      });
+    });
+
+    document.querySelectorAll('[data-del-item]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.delItem);
+        m.items.splice(idx, 1);
+        state.mapDirty = true;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-del-layer]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.delLayer);
+        m.layers.splice(idx, 1);
+        state.mapDirty = true;
+        render();
+      });
+    });
+
+    const btnAddItem = document.getElementById('btnAddItem');
+    if (btnAddItem) btnAddItem.addEventListener('click', () => {
+      m.items.push({ name: '', price: 0, bonus: 0 });
+      state.mapDirty = true;
+      render();
+      setTimeout(() => {
+        const rows = document.querySelectorAll('table[data-table="items"] tbody tr');
+        const lastRow = rows[rows.length - 1];
+        if (lastRow) {
+          const input = lastRow.querySelector('input[data-col="name"]');
+          if (input) input.focus();
+        }
+      }, 50);
+    });
+
+    const btnAddLayer = document.getElementById('btnAddLayer');
+    if (btnAddLayer) btnAddLayer.addEventListener('click', () => {
+      m.layers.push({ keyword: '', nickname: '' });
+      state.mapDirty = true;
+      render();
+      setTimeout(() => {
+        const rows = document.querySelectorAll('table[data-table="layers"] tbody tr');
+        const lastRow = rows[rows.length - 1];
+        if (lastRow) {
+          const input = lastRow.querySelector('input[data-col="keyword"]');
+          if (input) input.focus();
+        }
+      }, 50);
+    });
+
+    const btnSave = document.getElementById('btnSaveMap');
+    if (btnSave) btnSave.addEventListener('click', saveCurrentMap);
+
+    const btnDel = document.getElementById('btnDeleteMap');
+    if (btnDel) btnDel.addEventListener('click', deleteCurrentMap);
+
+    const btnReset = document.getElementById('btnResetMap');
+    if (btnReset) btnReset.addEventListener('click', () => {
+      if (!state.mapDirty) return;
+      if (!confirm('放弃所有未保存的修改？')) return;
+      const m2 = state.mapsList.find(x => x.name === state.currentMapName);
+      state.editingMap = m2 ? JSON.parse(JSON.stringify(m2)) : null;
+      state.mapDirty = false;
+      render();
+    });
+  }
+
+  function updateMapStatus() {
+    const s = document.getElementById('mapStatus');
+    if (!s) return;
+    if (state.mapDirty) {
+      s.style.color = '#f0d080';
+      s.textContent = '● 有未保存的修改';
+    } else {
+      s.style.color = '';
+      s.textContent = '';
+    }
+  }
+
+  function saveCurrentMap() {
+    if (!state.editingMap) return;
+    const m = state.editingMap;
+    if (!m.name || !m.name.trim()) {
+      alert('地图名不能为空');
+      return;
+    }
+
+    const btn = document.getElementById('btnSaveMap');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    fetch(API + '/api/maps/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(m)
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          const idx = state.mapsList.findIndex(x => x.name === m.name);
+          if (idx >= 0) state.mapsList[idx] = JSON.parse(JSON.stringify(m));
+          else state.mapsList.push(JSON.parse(JSON.stringify(m)));
+
+          state.currentMapName = m.name;
+          state.mapDirty = false;
+
+          const s = document.getElementById('mapStatus');
+          if (s) {
+            s.style.color = '#90d090';
+            s.textContent = '✓ 已保存（回主界面点"重载配置"生效）';
+            setTimeout(() => {
+              if (s.textContent.indexOf('已保存') >= 0) s.textContent = '';
+            }, 4000);
+          }
+          render();
+        } else {
+          alert('保存失败：' + (res.error || '未知错误'));
+          btn.disabled = false;
+          btn.textContent = '保存本地图';
+        }
+      })
+      .catch(err => {
+        alert('保存异常：' + err.message);
+        btn.disabled = false;
+        btn.textContent = '保存本地图';
+      });
+  }
+
+  function deleteCurrentMap() {
+    if (!state.editingMap) return;
+    const name = state.editingMap.name;
+    if (!confirm('确定删除地图 "' + name + '"？此操作不可恢复。')) return;
+
+    fetch(API + '/api/maps/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ name: name })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          state.mapsList = state.mapsList.filter(x => x.name !== name);
+          state.currentMapName = state.mapsList.length > 0 ? state.mapsList[0].name : '';
+          state.editingMap = state.mapsList.length > 0 ?
+            JSON.parse(JSON.stringify(state.mapsList[0])) : null;
+          state.mapDirty = false;
+          render();
+        } else {
+          alert('删除失败');
+        }
+      })
+      .catch(err => alert('删除异常：' + err.message));
+  }
+
+  // ==================== 预测规则 ====================
+
+  function renderPredictions() {
+    if (!state.predsLoaded) {
+      loadPredictions();
+      return '<div class="loading">正在加载预测规则...</div>';
+    }
+
+    let listHtml = state.predictionsList.map(r => {
+      const active = r.rule_id === state.currentPredId ? ' active' : '';
+      const tag = r.enabled ? '' : ' <span class="tag">(禁用)</span>';
+      return '<div class="rule-list-item' + active + '" data-pred="' +
+             escapeHtml(r.rule_id) + '">' + escapeHtml(r.name) + tag + '</div>';
+    }).join('');
+
+    let detailHtml;
+    if (!state.editingPred) {
+      detailHtml = '<div class="map-empty">← 从左侧选择规则，或点击"+ 新建规则"</div>';
+    } else {
+      detailHtml = renderPredDetail(state.editingPred);
+    }
+
+    return '<div class="rule-layout">' +
+      '<aside class="rule-list">' +
+        '<div class="rule-list-header"><button id="btnNewPred">+ 新建规则</button></div>' +
+        '<div class="rule-list-items">' +
+          (listHtml || '<div class="map-empty" style="padding:20px;font-size:12px">暂无规则</div>') +
+        '</div>' +
+      '</aside>' +
+      '<section class="rule-detail">' + detailHtml + '</section>' +
+    '</div>';
+  }
+
+  function renderPredDetail(r) {
+    const g = 'rule-grid';
+    let h = '<h3>基本信息</h3><div class="' + g + '">';
+    h += '<label>规则名称</label><input type="text" data-field="name" value="' + escapeHtml(r.name || '') + '">';
+    h += '<label>启用</label><label class="checkbox-wrap"><input type="checkbox" data-field="enabled" ' + (r.enabled ? 'checked' : '') + '><span>' + (r.enabled ? '已启用' : '已禁用') + '</span></label>';
+    h += '<label>规则 ID</label><input type="text" value="' + escapeHtml(r.rule_id || '') + '" readonly style="color:#808080">';
+    h += '</div>';
+
+    h += '<h3>预备条件（第一步）</h3><div class="' + g + '">';
+    h += '<label>消息码</label><input type="text" data-field="prep_msg" value="' + escapeHtml(r.prep_msg || '00') + '">';
+    h += '<label>类型码</label><input type="text" data-field="prep_type" value="' + escapeHtml(r.prep_type || '0839') + '">';
+    h += '<label>关键词（逗号分隔）</label><input type="text" data-field="prep_keywords" value="' + escapeHtml(r.prep_keywords || '') + '" placeholder="多个用逗号分隔">';
+    h += '<label>超时(秒)</label><input type="number" data-field="timeout" value="' + (r.timeout || 30) + '">';
+    h += '</div>';
+
+    h += '<h3>判断条件（第二步）</h3><div class="' + g + '">';
+    h += '<label>消息码</label><input type="text" data-field="judge_msg" value="' + escapeHtml(r.judge_msg || '273') + '">';
+    h += '<label>类型码</label><input type="text" data-field="judge_type" value="' + escapeHtml(r.judge_type || '0197') + '">';
+    h += '</div>';
+
+    h += '<h3>失败处理</h3><div class="' + g + '">';
+    h += '<label>发送消息</label><label class="checkbox-wrap"><input type="checkbox" data-field="fail_send" ' + (r.fail_send ? 'checked' : '') + '><span>' + (r.fail_send ? '是' : '否') + '</span></label>';
+    h += '<label>失败文本</label><input type="text" data-field="fail_text" value="' + escapeHtml(r.fail_text || '/e 失败') + '">';
+    h += '<label>失败特征码</label><input type="text" data-field="fail_codes" value="' + escapeHtml(r.fail_codes || '') + '" placeholder="多个用逗号分隔">';
+    h += '</div>';
+
+    h += '<h3>成功处理</h3><div class="' + g + '">';
+    h += '<label>发送消息</label><label class="checkbox-wrap"><input type="checkbox" data-field="success_send" ' + (r.success_send ? 'checked' : '') + '><span>' + (r.success_send ? '是' : '否') + '</span></label>';
+    h += '<label>成功文本</label><input type="text" data-field="success_text" value="' + escapeHtml(r.success_text || '/e 成功') + '">';
+    h += '<label>成功特征码</label><input type="text" data-field="success_codes" value="' + escapeHtml(r.success_codes || '') + '" placeholder="多个用逗号分隔，留空=通配">';
+    h += '</div>';
+
+    h += '<h3>未知结果处理</h3><div class="' + g + '">';
+    h += '<label>行为</label><select data-field="unknown_action">';
+    h += '<option value="ignore"' + (r.unknown_action === 'ignore' ? ' selected' : '') + '>忽略</option>';
+    h += '<option value="send_unknown"' + (r.unknown_action === 'send_unknown' ? ' selected' : '') + '>发送"未知"消息</option>';
+    h += '</select></div>';
+
+    h += '<h3>网络管道（可选）</h3><div class="' + g + '">';
+    h += '<label>预备关键词</label><input type="text" data-field="net_prep_keywords" value="' + escapeHtml(r.net_prep_keywords || '') + '" placeholder="如 |2c04|">';
+    h += '<label>判断类别码</label><input type="text" data-field="net_judge_category" value="' + escapeHtml(r.net_judge_category || '') + '" placeholder="如 197">';
+    h += '</div>';
+
+    h += '<div class="rule-actions">';
+    h += '<button class="btn-primary" id="btnSavePred">保存本规则</button>';
+    h += '<button class="btn-danger" id="btnDeletePred">删除本规则</button>';
+    h += '<button id="btnResetPred">放弃修改</button>';
+    h += '<span id="ruleStatus"></span>';
+    h += '</div>';
+    return h;
+  }
+
+  function loadPredictions() {
+    fetch(API + '/api/predictions/all')
+      .then(r => r.json())
+      .then(data => {
+        state.predictionsList = data.predictions || [];
+        state.predsLoaded = true;
+        if (state.predictionsList.length > 0 && !state.currentPredId) {
+          state.currentPredId = state.predictionsList[0].rule_id;
+          state.editingPred = JSON.parse(JSON.stringify(state.predictionsList[0]));
+        }
+        render();
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML =
+          '<div class="placeholder"><span class="icon">⚠️</span>加载失败：' + escapeHtml(err.message) + '</div>';
+      });
+  }
+
+  function bindPredEvents() {
+    if (state.currentTab !== 'predictions') return;
+
+    document.querySelectorAll('.rule-list-item[data-pred]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (state.predDirty && !confirm('当前规则有未保存修改，切换会丢失，继续？')) return;
+        const id = el.dataset.pred;
+        const r = state.predictionsList.find(x => x.rule_id === id);
+        if (!r) return;
+        state.currentPredId = id;
+        state.editingPred = JSON.parse(JSON.stringify(r));
+        state.predDirty = false;
+        render();
+      });
+    });
+
+    const btnNew = document.getElementById('btnNewPred');
+    if (btnNew) btnNew.addEventListener('click', () => {
+      if (state.predDirty && !confirm('当前有未保存修改，新建会丢失，继续？')) return;
+      const newId = 'pred_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      state.currentPredId = '';
+      state.editingPred = {
+        rule_id: newId, name: '新预测规则', enabled: true,
+        prep_msg: '00', prep_type: '0839', prep_keywords: '', timeout: 30,
+        judge_msg: '273', judge_type: '0197',
+        fail_send: true, fail_text: '/e 失败<se.11>', fail_codes: '',
+        success_send: true, success_text: '/e 成功<se.8>', success_codes: '',
+        unknown_action: 'ignore', net_prep_keywords: '', net_judge_category: ''
+      };
+      state.predDirty = true;
+      render();
+    });
+
+    if (!state.editingPred) return;
+    const r = state.editingPred;
+
+    document.querySelectorAll('.rule-detail [data-field]').forEach(el => {
+      const field = el.dataset.field;
+      const handler = () => {
+        if (el.type === 'checkbox') r[field] = el.checked;
+        else if (el.type === 'number') r[field] = parseFloat(el.value) || 0;
+        else r[field] = el.value;
+        state.predDirty = true;
+        updateRuleStatus();
+        if (el.type === 'checkbox') {
+          const span = el.parentElement.querySelector('span');
+          if (span) span.textContent = el.checked ? '是' : '否';
+        }
+      };
+      el.addEventListener('change', handler);
+      if (el.type !== 'checkbox' && el.tagName !== 'SELECT') el.addEventListener('input', handler);
+    });
+
+    const btnSave = document.getElementById('btnSavePred');
+    if (btnSave) btnSave.addEventListener('click', savePred);
+
+    const btnDel = document.getElementById('btnDeletePred');
+    if (btnDel) btnDel.addEventListener('click', deletePred);
+
+    const btnReset = document.getElementById('btnResetPred');
+    if (btnReset) btnReset.addEventListener('click', () => {
+      if (!state.predDirty) return;
+      if (!confirm('放弃修改？')) return;
+      const r2 = state.predictionsList.find(x => x.rule_id === state.currentPredId);
+      state.editingPred = r2 ? JSON.parse(JSON.stringify(r2)) : null;
+      state.predDirty = false;
+      render();
+    });
+  }
+
+  function savePred() {
+    if (!state.editingPred) return;
+    const r = state.editingPred;
+    if (!r.name || !r.name.trim()) { alert('规则名称不能为空'); return; }
+
+    fetch(API + '/api/predictions/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(r)
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.ok) {
+          const idx = state.predictionsList.findIndex(x => x.rule_id === r.rule_id);
+          if (idx >= 0) state.predictionsList[idx] = JSON.parse(JSON.stringify(r));
+          else state.predictionsList.push(JSON.parse(JSON.stringify(r)));
+          state.currentPredId = r.rule_id;
+          state.predDirty = false;
+          const s = document.getElementById('ruleStatus');
+          if (s) { s.style.color = '#90d090'; s.textContent = '✓ 已保存'; setTimeout(() => { if (s) s.textContent = ''; }, 3000); }
+          render();
+        } else alert('保存失败：' + (res.error || '未知'));
+      })
+      .catch(err => alert('保存异常：' + err.message));
+  }
+
+  function deletePred() {
+    if (!state.editingPred) return;
+    if (!confirm('确定删除该预测规则？')) return;
+    fetch(API + '/api/predictions/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ rule_id: state.editingPred.rule_id })
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.ok) {
+          state.predictionsList = state.predictionsList.filter(x => x.rule_id !== state.editingPred.rule_id);
+          state.currentPredId = state.predictionsList.length > 0 ? state.predictionsList[0].rule_id : '';
+          state.editingPred = state.predictionsList.length > 0 ? JSON.parse(JSON.stringify(state.predictionsList[0])) : null;
+          state.predDirty = false;
+          render();
+        } else alert('删除失败');
+      })
+      .catch(err => alert('删除异常：' + err.message));
+  }
+
+  function updateRuleStatus() {
+    const s = document.getElementById('ruleStatus');
+    if (!s) return;
+    const dirty = state.predDirty || state.ruleDirty;
+    s.style.color = dirty ? '#f0d080' : '';
+    s.textContent = dirty ? '● 有未保存的修改' : '';
+  }
+
+  // ==================== 触发器规则 ====================
+
+  function renderRules() {
+    if (!state.rulesLoaded) {
+      loadRules();
+      return '<div class="loading">正在加载触发器规则...</div>';
+    }
+
+    let listHtml = state.rulesList.map(r => {
+      const active = r.rule_id === state.currentRuleId ? ' active' : '';
+      const tag = r.enabled ? '' : ' <span class="tag">(禁用)</span>';
+      return '<div class="rule-list-item' + active + '" data-rule="' +
+             escapeHtml(r.rule_id) + '">' + escapeHtml(r.name) + tag + '</div>';
+    }).join('');
+
+    let detailHtml;
+    if (!state.editingRule) {
+      detailHtml = '<div class="map-empty">← 从左侧选择规则，或点击"+ 新建规则"</div>';
+    } else {
+      detailHtml = renderRuleDetail(state.editingRule);
+    }
+
+    return '<div class="rule-layout">' +
+      '<aside class="rule-list">' +
+        '<div class="rule-list-header"><button id="btnNewRule">+ 新建规则</button></div>' +
+        '<div class="rule-list-items">' +
+          (listHtml || '<div class="map-empty" style="padding:20px;font-size:12px">暂无规则</div>') +
+        '</div>' +
+      '</aside>' +
+      '<section class="rule-detail">' + detailHtml + '</section>' +
+    '</div>';
+  }
+
+  function renderRuleDetail(r) {
+    const g = 'rule-grid';
+    const isTwo = r.trigger_mode === 'two_step';
+
+    let h = '<h3>基本信息</h3><div class="' + g + '">';
+    h += '<label>规则名称</label><input type="text" data-field="name" value="' + escapeHtml(r.name || '') + '">';
+    h += '<label>启用</label><label class="checkbox-wrap"><input type="checkbox" data-field="enabled" ' + (r.enabled ? 'checked' : '') + '><span>' + (r.enabled ? '已启用' : '已禁用') + '</span></label>';
+    h += '<label>作用域</label><select data-field="scope">';
+    h += '<option value="global"' + (r.scope === 'global' ? ' selected' : '') + '>全局</option>';
+    h += '<option value="map"' + (r.scope === 'map' ? ' selected' : '') + '>特定地图</option>';
+    h += '</select>';
+    h += '<label>关联地图</label><input type="text" data-field="map_name" value="' + escapeHtml(r.map_name || '') + '" placeholder="scope=map 时填写地图名">';
+    h += '<label>触发模式</label><select data-field="trigger_mode" id="selTriggerMode">';
+    h += '<option value="simple"' + (!isTwo ? ' selected' : '') + '>简单（单条件）</option>';
+    h += '<option value="two_step"' + (isTwo ? ' selected' : '') + '>两步（先触发后等待）</option>';
+    h += '</select>';
+    h += '</div>';
+
+    if (!isTwo) {
+      h += '<h3>触发条件</h3><div class="' + g + '">';
+      h += '<label>消息码</label><input type="text" data-field="message_code" value="' + escapeHtml(r.message_code || '') + '">';
+      h += '<label>类型码</label><input type="text" data-field="type_code" value="' + escapeHtml(r.type_code || '') + '">';
+      h += '<label>关键词</label><input type="text" data-field="keyword" value="' + escapeHtml(r.keyword || '') + '">';
+      h += '<label>使用正则</label><label class="checkbox-wrap"><input type="checkbox" data-field="use_regex" ' + (r.use_regex ? 'checked' : '') + '><span>' + (r.use_regex ? '是' : '否') + '</span></label>';
+      h += '</div>';
+    } else {
+      // 两步模式
+      const fc = (r.first_conditions && r.first_conditions[0]) || {};
+      const sc = (r.second_conditions && r.second_conditions[0]) || {};
+      h += '<h3>第一步条件</h3><div class="' + g + '">';
+      h += '<label>消息码</label><input type="text" data-step="first" data-field="message_code" value="' + escapeHtml(fc.message_code || '') + '">';
+      h += '<label>类型码</label><input type="text" data-step="first" data-field="type_code" value="' + escapeHtml(fc.type_code || '') + '">';
+      h += '<label>关键词</label><input type="text" data-step="first" data-field="keyword" value="' + escapeHtml(fc.keyword || '') + '">';
+      h += '<label>使用正则</label><label class="checkbox-wrap"><input type="checkbox" data-step="first" data-field="use_regex" ' + (fc.use_regex ? 'checked' : '') + '><span>' + (fc.use_regex ? '是' : '否') + '</span></label>';
+      h += '</div>';
+
+      h += '<h3>第二步条件</h3><div class="' + g + '">';
+      h += '<label>消息码</label><input type="text" data-step="second" data-field="message_code" value="' + escapeHtml(sc.message_code || '') + '">';
+      h += '<label>类型码</label><input type="text" data-step="second" data-field="type_code" value="' + escapeHtml(sc.type_code || '') + '">';
+      h += '<label>关键词</label><input type="text" data-step="second" data-field="keyword" value="' + escapeHtml(sc.keyword || '') + '">';
+      h += '<label>使用正则</label><label class="checkbox-wrap"><input type="checkbox" data-step="second" data-field="use_regex" ' + (sc.use_regex ? 'checked' : '') + '><span>' + (sc.use_regex ? '是' : '否') + '</span></label>';
+      h += '</div>';
+
+      h += '<h3>超时</h3><div class="' + g + '">';
+      h += '<label>超时秒数</label><input type="number" data-field="timeout" value="' + (r.timeout || 30) + '">';
+      h += '<label>超时提醒文本</label><input type="text" data-field="timeout_text" value="' + escapeHtml(r.timeout_text || '') + '">';
+      h += '<label>通过鲶鱼精发送</label><label class="checkbox-wrap"><input type="checkbox" data-field="timeout_send" ' + (r.timeout_send ? 'checked' : '') + '><span>' + (r.timeout_send ? '是' : '否') + '</span></label>';
+      h += '</div>';
+    }
+
+    // 动作列表
+    h += '<h3>动作列表</h3>';
+    const actions = r.actions || [];
+    if (actions.length === 0) {
+      h += '<div style="color:#808080;padding:10px">（暂无动作）</div>';
+    } else {
+      actions.forEach((a, i) => {
+        h += '<div class="action-row" data-action-idx="' + i + '">';
+        h += '<div class="action-header">';
+        h += '<span class="num">动作 ' + (i + 1) + '</span>';
+        if (i > 0) h += '<span style="color:#808080;font-size:12px">延迟(ms)：</span><input type="number" data-action-field="delay_ms" value="' + (a.delay_ms || 0) + '" style="width:80px;background:#1e1e1e;color:#f0d080;border:1px solid #3a3a3a;border-radius:3px;padding:3px 6px">';
+        h += '<button class="btn-del" data-del-action="' + i + '">×</button>';
+        h += '</div>';
+        h += '<div class="' + g + '">';
+        h += '<label>动作类型</label><select data-action-field="action_type">';
+        h += '<option value="record"' + (a.action_type === 'record' ? ' selected' : '') + '>记录</option>';
+        h += '<option value="output"' + (a.action_type === 'output' ? ' selected' : '') + '>输出</option>';
+        h += '</select>';
+        if (a.action_type === 'output') {
+          h += '<label>输出文本</label><input type="text" data-action-field="output_text" value="' + escapeHtml(a.output_text || '') + '">';
+        } else {
+          h += '<label>记录名</label><input type="text" data-action-field="record_name" value="' + escapeHtml(a.record_name || '') + '">';
+          h += '<label>数值(支持 "+" 用捕获)</label><input type="text" data-action-field="record_value" value="' + escapeHtml(a.record_value || '1') + '">';
+        }
+        h += '</div></div>';
+      });
+    }
+    h += '<button class="add-row-btn" id="btnAddAction" style="margin-top:6px">+ 添加动作</button>';
+
+    h += '<div class="rule-actions">';
+    h += '<button class="btn-primary" id="btnSaveRule">保存本规则</button>';
+    h += '<button class="btn-danger" id="btnDeleteRule">删除本规则</button>';
+    h += '<button id="btnResetRule">放弃修改</button>';
+    h += '<span id="ruleStatus"></span>';
+    h += '</div>';
+    return h;
+  }
+
+  function loadRules() {
+    fetch(API + '/api/rules/all')
+      .then(r => r.json())
+      .then(data => {
+        state.rulesList = data.rules || [];
+        state.rulesLoaded = true;
+        if (state.rulesList.length > 0 && !state.currentRuleId) {
+          state.currentRuleId = state.rulesList[0].rule_id;
+          state.editingRule = JSON.parse(JSON.stringify(state.rulesList[0]));
+        }
+        render();
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML =
+          '<div class="placeholder"><span class="icon">⚠️</span>加载失败：' + escapeHtml(err.message) + '</div>';
+      });
+  }
+
+  function bindRuleEvents() {
+    if (state.currentTab !== 'rules') return;
+
+    document.querySelectorAll('.rule-list-item[data-rule]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (state.ruleDirty && !confirm('当前规则有未保存修改，切换会丢失，继续？')) return;
+        const id = el.dataset.rule;
+        const r = state.rulesList.find(x => x.rule_id === id);
+        if (!r) return;
+        state.currentRuleId = id;
+        state.editingRule = JSON.parse(JSON.stringify(r));
+        state.ruleDirty = false;
+        render();
+      });
+    });
+
+    const btnNew = document.getElementById('btnNewRule');
+    if (btnNew) btnNew.addEventListener('click', () => {
+      if (state.ruleDirty && !confirm('当前有未保存修改，新建会丢失，继续？')) return;
+      state.currentRuleId = '';
+      state.editingRule = {
+        rule_id: '', name: '新触发器规则', enabled: true,
+        scope: 'global', map_name: '', trigger_mode: 'simple',
+        message_code: '', type_code: '', keyword: '', use_regex: false,
+        first_conditions: [], second_conditions: [], timeout: 30,
+        timeout_text: '', timeout_send: false,
+        actions: [{ action_type: 'record', delay_ms: 0, record_name: '', record_value: '1', output_text: '' }],
+        category: 'general'
+      };
+      state.ruleDirty = true;
+      render();
+    });
+
+    if (!state.editingRule) return;
+    const r = state.editingRule;
+
+    // 通用字段
+    document.querySelectorAll('.rule-detail [data-field]').forEach(el => {
+      if (el.closest('[data-action-idx]')) return; // 动作字段单独处理
+      const field = el.dataset.field;
+      const step = el.dataset.step;
+      const handler = () => {
+        let v;
+        if (el.type === 'checkbox') v = el.checked;
+        else if (el.type === 'number') v = parseFloat(el.value) || 0;
+        else v = el.value;
+
+        if (step === 'first') {
+          if (!r.first_conditions || r.first_conditions.length === 0) r.first_conditions = [{}];
+          r.first_conditions[0][field] = v;
+        } else if (step === 'second') {
+          if (!r.second_conditions || r.second_conditions.length === 0) r.second_conditions = [{}];
+          r.second_conditions[0][field] = v;
+        } else {
+          r[field] = v;
+        }
+        state.ruleDirty = true;
+        updateRuleStatus();
+        if (el.type === 'checkbox') {
+          const span = el.parentElement.querySelector('span');
+          if (span) span.textContent = el.checked ? '是' : '否';
+        }
+      };
+      el.addEventListener('change', handler);
+      if (el.type !== 'checkbox' && el.tagName !== 'SELECT') el.addEventListener('input', handler);
+    });
+
+    // 触发模式切换 → 重渲染
+    const selMode = document.getElementById('selTriggerMode');
+    if (selMode) selMode.addEventListener('change', () => {
+      r.trigger_mode = selMode.value;
+      if (r.trigger_mode === 'two_step') {
+        if (!r.first_conditions || r.first_conditions.length === 0) r.first_conditions = [{}];
+        if (!r.second_conditions || r.second_conditions.length === 0) r.second_conditions = [{}];
+      }
+      state.ruleDirty = true;
+      render();
+    });
+
+    // 动作字段
+    document.querySelectorAll('[data-action-idx]').forEach(row => {
+      const idx = parseInt(row.dataset.actionIdx);
+      if (!r.actions[idx]) return;
+      row.querySelectorAll('[data-action-field]').forEach(el => {
+        const field = el.dataset.actionField;
+        const handler = () => {
+          let v;
+          if (el.type === 'number') v = parseFloat(el.value) || 0;
+          else v = el.value;
+          r.actions[idx][field] = v;
+          state.ruleDirty = true;
+          updateRuleStatus();
+          // 动作类型切换时重渲染
+          if (field === 'action_type') render();
+        };
+        el.addEventListener('change', handler);
+        if (el.tagName !== 'SELECT') el.addEventListener('input', handler);
+      });
+    });
+
+    document.querySelectorAll('[data-del-action]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.delAction);
+        r.actions.splice(idx, 1);
+        state.ruleDirty = true;
+        render();
+      });
+    });
+
+    const btnAddAction = document.getElementById('btnAddAction');
+    if (btnAddAction) btnAddAction.addEventListener('click', () => {
+      r.actions = r.actions || [];
+      r.actions.push({ action_type: 'record', delay_ms: 0, record_name: '', record_value: '1', output_text: '' });
+      state.ruleDirty = true;
+      render();
+    });
+
+    const btnSave = document.getElementById('btnSaveRule');
+    if (btnSave) btnSave.addEventListener('click', saveRule);
+
+    const btnDel = document.getElementById('btnDeleteRule');
+    if (btnDel) btnDel.addEventListener('click', deleteRule);
+
+    const btnReset = document.getElementById('btnResetRule');
+    if (btnReset) btnReset.addEventListener('click', () => {
+      if (!state.ruleDirty) return;
+      if (!confirm('放弃修改？')) return;
+      const r2 = state.rulesList.find(x => x.rule_id === state.currentRuleId);
+      state.editingRule = r2 ? JSON.parse(JSON.stringify(r2)) : null;
+      state.ruleDirty = false;
+      render();
+    });
+  }
+
+  function saveRule() {
+    if (!state.editingRule) return;
+    const r = state.editingRule;
+    if (!r.name || !r.name.trim()) { alert('规则名称不能为空'); return; }
+
+    fetch(API + '/api/rules/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(r)
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.ok) {
+          // 重新加载列表（可能生成新 rule_id）
+          fetch(API + '/api/rules/all')
+            .then(rr => rr.json())
+            .then(data => {
+              state.rulesList = data.rules || [];
+              // 找刚保存的（按名字）
+              const found = state.rulesList.find(x => x.name === r.name);
+              if (found) {
+                state.currentRuleId = found.rule_id;
+                state.editingRule = JSON.parse(JSON.stringify(found));
+              }
+              state.ruleDirty = false;
+              const s = document.getElementById('ruleStatus');
+              if (s) { s.style.color = '#90d090'; s.textContent = '✓ 已保存'; setTimeout(() => { if (s) s.textContent = ''; }, 3000); }
+              render();
+            });
+        } else alert('保存失败：' + (res.error || '未知'));
+      })
+      .catch(err => alert('保存异常：' + err.message));
+  }
+
+  function deleteRule() {
+    if (!state.editingRule || !state.editingRule.rule_id) { alert('该规则尚未保存'); return; }
+    if (!confirm('确定删除该触发器规则？')) return;
+    fetch(API + '/api/rules/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ rule_id: state.editingRule.rule_id })
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.ok) {
+          state.rulesList = state.rulesList.filter(x => x.rule_id !== state.editingRule.rule_id);
+          state.currentRuleId = state.rulesList.length > 0 ? state.rulesList[0].rule_id : '';
+          state.editingRule = state.rulesList.length > 0 ? JSON.parse(JSON.stringify(state.rulesList[0])) : null;
+          state.ruleDirty = false;
+          render();
+        } else alert('删除失败');
+      })
+      .catch(err => alert('删除异常：' + err.message));
+  }
+
+  // ==================== 导入导出 ====================
+
+  function renderIE() {
+    return `
+      <div class="ie-group">
+        <h2>📤 导出全部配置</h2>
+        <p>把当前所有配置（通用设置、地图、预测规则、触发器规则）打包成一个 JSON 文件下载。<br>
+           用于备份、分享或迁移到其他电脑。</p>
+        <button class="primary" id="btnExportAll">导出全部配置</button>
+        <div class="ie-status" id="ieExportStatus"></div>
+      </div>
+
+      <div class="ie-group">
+        <h2>📥 导入配置</h2>
+        <p>选择之前导出的 JSON 文件，覆盖当前所有配置。<br>
+           <strong style="color:#e08080">注意：此操作会覆盖现有配置，请先备份！</strong></p>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+        <button id="btnImportAll">选择 JSON 文件并导入</button>
+        <div class="ie-status" id="ieImportStatus"></div>
+      </div>
+
+      <div class="ie-group">
+        <h2>🔄 从本机备份（可选）</h2>
+        <p>也可以直接复制这个目录进行备份：<br>
+           <code style="color:#f0d080">%APPDATA%\\FF14TreasureHunter\\config\\</code></p>
+      </div>
+    `;
+  }
+
+  function bindIEEvents() {
+    if (state.currentTab !== 'ie') return;
+
+    const btnExport = document.getElementById('btnExportAll');
+    if (btnExport) btnExport.addEventListener('click', exportAll);
+
+    const btnImport = document.getElementById('btnImportAll');
+    if (btnImport) btnImport.addEventListener('click', () => {
+      document.getElementById('fileImport').click();
+    });
+
+    const fileInput = document.getElementById('fileImport');
+    if (fileInput) fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => importAll(ev.target.result);
+      reader.readAsText(file, 'utf-8');
+      fileInput.value = '';
+    });
+  }
+
+  function exportAll() {
+    const status = document.getElementById('ieExportStatus');
+    status.className = 'ie-status';
+    status.textContent = '正在收集配置...';
+
+    Promise.all([
+      fetch(API + '/api/config/all').then(r => r.json()),
+      fetch(API + '/api/maps/all').then(r => r.json()),
+      fetch(API + '/api/predictions/all').then(r => r.json()),
+      fetch(API + '/api/rules/all').then(r => r.json())
+    ])
+      .then(([cfg, maps, preds, rules]) => {
+        const backup = {
+          _meta: {
+            version: 1,
+            exported_at: new Date().toISOString(),
+            source: 'FF14 TreasureHunter ACT Plugin'
+          },
+          config: cfg,
+          maps: maps.maps || [],
+          predictions: preds.predictions || [],
+          rules: rules.rules || []
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+        a.href = url;
+        a.download = 'FF14TreasureHunter_backup_' + ts + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        status.className = 'ie-status ok';
+        status.textContent = '✓ 已导出（' + (json.length / 1024).toFixed(1) + ' KB）';
+      })
+      .catch(err => {
+        status.className = 'ie-status err';
+        status.textContent = '✗ 导出失败：' + err.message;
+      });
+  }
+
+  function importAll(text) {
+    const status = document.getElementById('ieImportStatus');
+    status.className = 'ie-status';
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      status.className = 'ie-status err';
+      status.textContent = '✗ JSON 格式错误：' + e.message;
+      return;
+    }
+
+    if (!data.config && !data.maps && !data.predictions && !data.rules) {
+      status.className = 'ie-status err';
+      status.textContent = '✗ 文件格式不正确（缺少必要字段）';
+      return;
+    }
+
+    if (!confirm('导入将覆盖当前全部配置（地图/预测/触发器），确定继续？')) return;
+
+    status.textContent = '正在导入...';
+
+    const tasks = [];
+
+    // 1. 导入地图（逐个保存，覆盖同名的）
+    if (data.maps && data.maps.length > 0) {
+      data.maps.forEach(m => {
+        tasks.push(fetch(API + '/api/maps/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(m)
+        }));
+      });
+    }
+
+    // 2. 预测规则
+    if (data.predictions && data.predictions.length > 0) {
+      data.predictions.forEach(p => {
+        tasks.push(fetch(API + '/api/predictions/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(p)
+        }));
+      });
+    }
+
+    // 3. 触发器规则
+    if (data.rules && data.rules.length > 0) {
+      data.rules.forEach(r => {
+        tasks.push(fetch(API + '/api/rules/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(r)
+        }));
+      });
+    }
+
+    // 4. 配置项（批量）
+    if (data.config && typeof data.config === 'object') {
+      const items = [];
+      flattenConfig(data.config, '', items);
+      if (items.length > 0) {
+        tasks.push(fetch(API + '/api/config/batch-set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify({ items: items })
+        }));
+      }
+    }
+
+    Promise.all(tasks)
+      .then(() => {
+        status.className = 'ie-status ok';
+        status.textContent = '✓ 导入完成（' + tasks.length + ' 项）。请关闭页面并重载插件。';
+        setTimeout(() => { if (confirm('导入完成，重新加载配置？')) location.reload(); }, 500);
+      })
+      .catch(err => {
+        status.className = 'ie-status err';
+        status.textContent = '✗ 导入失败：' + err.message;
+      });
+  }
+
+  // 把嵌套配置对象打平成 [{path, value}, ...]
+  function flattenConfig(obj, prefix, result) {
+    for (const k in obj) {
+      if (!obj.hasOwnProperty(k)) continue;
+      const v = obj[k];
+      const path = prefix ? (prefix + '.' + k) : k;
+      if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+        flattenConfig(v, path, result);
+      } else if (v !== undefined) {
+        result.push({ path: path, value: v });
+      }
+    }
+  }
+  // ==================== 发布管理 ====================
+
+  function renderPublish() {
+    if (!state.publishLoaded) {
+      loadPublishData();
+      return '<div class="loading">正在加载数据...</div>';
+    }
+
+    // 数据版本默认 = 今天
+    if (!state.dataVersion) {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      state.dataVersion = '' + y + m + day;
+    }
+
+    // 地图列表
+    let mapsHtml = '';
+    if (state.publishMaps.length === 0) {
+      mapsHtml = '<div style="color:#666;padding:20px;text-align:center">暂无地图</div>';
+    } else {
+      state.publishMaps.forEach(m => {
+        mapsHtml += '<div class="pub-row">' +
+          '<label class="checkbox-wrap">' +
+            '<input type="checkbox" data-pub-map="' + escapeHtml(m.id || m.name) + '" ' +
+              (m.published ? 'checked' : '') + '>' +
+            '<span></span>' +
+          '</label>' +
+          '<span class="pub-name">' + escapeHtml(m.name) + '</span>' +
+          '<span class="pub-id">id: ' + escapeHtml(m.id || '(未生成)') + '</span>' +
+          '<button class="btn-edit-id" data-edit-map-id="' + escapeHtml(m.name) + '">编辑ID</button>' +
+        '</div>';
+      });
+    }
+
+    // 预测规则列表
+    let predsHtml = '';
+    if (state.publishPreds.length === 0) {
+      predsHtml = '<div style="color:#666;padding:20px;text-align:center">暂无预测规则</div>';
+    } else {
+      state.publishPreds.forEach(r => {
+        predsHtml += '<div class="pub-row">' +
+          '<label class="checkbox-wrap">' +
+            '<input type="checkbox" data-pub-pred="' + escapeHtml(r.rule_id) + '" ' +
+              (r.published ? 'checked' : '') + '>' +
+            '<span></span>' +
+          '</label>' +
+          '<span class="pub-name">' + escapeHtml(r.name) + '</span>' +
+          '<span class="pub-id">id: ' + escapeHtml(r.rule_id) + '</span>' +
+        '</div>';
+      });
+    }
+
+    // 预览区
+    let previewHtml = '';
+    if (state.publishPreview) {
+      const pv = state.publishPreview;
+      const mapsStr = JSON.stringify({ maps: pv.maps }, null, 2);
+      const predsStr = JSON.stringify({ predictions: pv.predictions }, null, 2);
+      const verStr = JSON.stringify(pv.version, null, 2);
+      const cur = state.publishPreviewTab;
+      const content = cur === 'maps' ? mapsStr : (cur === 'preds' ? predsStr : verStr);
+
+      previewHtml =
+        '<div class="pub-preview-tabs">' +
+          '<div class="ptab' + (cur === 'maps' ? ' active' : '') + '" data-ptab="maps">maps.json (' + pv.maps.length + ')</div>' +
+          '<div class="ptab' + (cur === 'preds' ? ' active' : '') + '" data-ptab="preds">predictions.json (' + pv.predictions.length + ')</div>' +
+          '<div class="ptab' + (cur === 'ver' ? ' active' : '') + '" data-ptab="ver">version.json</div>' +
+        '</div>' +
+        '<textarea class="pub-preview-text" readonly>' + escapeHtml(content) + '</textarea>';
+    } else {
+      previewHtml = '<div style="color:#666;padding:20px;text-align:center">点击"预览"查看将发布的 JSON</div>';
+    }
+
+    return '' +
+      '<div class="pub-section">' +
+        '<h2>① 地图发布（勾选纳入发布包）</h2>' +
+        '<div class="pub-list">' + mapsHtml + '</div>' +
+      '</div>' +
+
+      '<div class="pub-section">' +
+        '<h2>② 预测规则发布（勾选纳入发布包）</h2>' +
+        '<div class="pub-list">' + predsHtml + '</div>' +
+      '</div>' +
+
+      '<div class="pub-section">' +
+        '<h2>③ 数据版本</h2>' +
+        '<div class="pub-version-row">' +
+          '<label>数据版本：</label>' +
+          '<input type="text" id="pubDataVersion" value="' + escapeHtml(state.dataVersion) + '" maxlength="20">' +
+          '<button id="btnPubSetToday">改为今天日期</button>' +
+        '</div>' +
+        '<div style="color:#808080;font-size:12px;margin-top:6px">' +
+          '建议格式 YYYYMMDD（如 20261013），用户端据此判断是否需要更新' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="pub-section">' +
+        '<h2>④ 预览与导出</h2>' +
+        '<button id="btnPubPreview" style="padding:7px 22px;background:#3d3d3d;color:#d0d0d0;border:1px solid #4a4a4a;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px">预览</button>' +
+        '<div style="margin-top:12px">' + previewHtml + '</div>' +
+        '<div class="pub-export-row">' +
+          '<button class="primary" id="btnPubExportMaps" ' + (state.publishPreview ? '' : 'disabled') + '>导出 maps.json</button>' +
+          '<button class="primary" id="btnPubExportPreds" ' + (state.publishPreview ? '' : 'disabled') + '>导出 predictions.json</button>' +
+          '<button class="primary" id="btnPubExportVer" ' + (state.publishPreview ? '' : 'disabled') + '>导出 version.json</button>' +
+        '</div>' +
+        '<div class="pub-status" id="pubStatus"></div>' +
+      '</div>' +
+    '';
+  }
+
+  function bindPublishEvents() {
+    if (state.currentTab !== 'publish') return;
+
+    // 地图勾选
+    document.querySelectorAll('[data-pub-map]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const key = cb.dataset.pubMap;
+        // 找到对应的地图（用 id 或 name 匹配）
+        const m = state.publishMaps.find(x => (x.id || x.name) === key);
+        if (!m) return;
+        m.published = cb.checked;
+        saveMapPublish(m);
+      });
+    });
+
+    // 预测规则勾选
+    document.querySelectorAll('[data-pub-pred]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = cb.dataset.pubPred;
+        const r = state.publishPreds.find(x => x.rule_id === id);
+        if (!r) return;
+        r.published = cb.checked;
+        savePredPublish(r);
+      });
+    });
+
+    // 编辑地图 ID
+    document.querySelectorAll('[data-edit-map-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.editMapId;
+        const m = state.publishMaps.find(x => x.name === name);
+        if (!m) return;
+        const newId = prompt('请输入新的地图 ID（建议格式：map_xxx）', m.id || ('map_' + name.toLowerCase()));
+        if (newId === null) return;
+        const trimmed = newId.trim();
+        if (!trimmed) { alert('ID 不能为空'); return; }
+        if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+          alert('ID 只能包含字母、数字、下划线、连字符');
+          return;
+        }
+        m.id = trimmed;
+        saveMapPublish(m);
+      });
+    });
+
+    // 改为今天日期
+    const btnToday = document.getElementById('btnPubSetToday');
+    if (btnToday) btnToday.addEventListener('click', () => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const v = '' + y + mo + day;
+      state.dataVersion = v;
+      const input = document.getElementById('pubDataVersion');
+      if (input) input.value = v;
+    });
+
+    // 数据版本输入
+    const verInput = document.getElementById('pubDataVersion');
+    if (verInput) verInput.addEventListener('input', () => {
+      state.dataVersion = verInput.value.trim();
+    });
+
+    // 预览
+    const btnPrev = document.getElementById('btnPubPreview');
+    if (btnPrev) btnPrev.addEventListener('click', previewPublish);
+
+    // 预览标签切换
+    document.querySelectorAll('.pub-preview-tabs .ptab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        state.publishPreviewTab = tab.dataset.ptab;
+        render();
+      });
+    });
+
+    // 导出按钮
+    const bM = document.getElementById('btnPubExportMaps');
+    if (bM) bM.addEventListener('click', () => {
+      if (!state.publishPreview) return;
+      exportJson('maps.json', JSON.stringify({ maps: state.publishPreview.maps }, null, 2));
+    });
+    const bP = document.getElementById('btnPubExportPreds');
+    if (bP) bP.addEventListener('click', () => {
+      if (!state.publishPreview) return;
+      exportJson('predictions.json', JSON.stringify({ predictions: state.publishPreview.predictions }, null, 2));
+    });
+    const bV = document.getElementById('btnPubExportVer');
+    if (bV) bV.addEventListener('click', () => {
+      if (!state.publishPreview) return;
+      exportJson('version.json', JSON.stringify(state.publishPreview.version, null, 2));
+    });
+  }
+
+  function loadPublishData() {
+    Promise.all([
+      fetch(API + '/api/maps/all').then(r => r.json()),
+      fetch(API + '/api/predictions/all').then(r => r.json())
+    ])
+      .then(([mapsData, predsData]) => {
+        state.publishMaps = (mapsData.maps || []).map(m => ({
+          id: m.id || '',
+          name: m.name,
+          published: m.published || false,
+          _raw: m
+        }));
+        state.publishPreds = (predsData.predictions || []).map(r => ({
+          rule_id: r.rule_id,
+          name: r.name,
+          published: r.published || false,
+          _raw: r
+        }));
+        state.publishLoaded = true;
+        render();
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML =
+          '<div class="placeholder"><span class="icon">⚠️</span>加载失败：' +
+          escapeHtml(err.message) + '</div>';
+      });
+  }
+
+  function saveMapPublish(pubEntry) {
+    // 用完整的原始地图对象 + 更新后的 published / id
+    const raw = JSON.parse(JSON.stringify(pubEntry._raw || {}));
+    raw.id = pubEntry.id;
+    raw.published = pubEntry.published;
+    if (!raw.name) raw.name = pubEntry.name;
+
+    fetch(API + '/api/maps/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(raw)
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) alert('保存失败');
+        else {
+          // 更新本地缓存
+          pubEntry._raw = raw;
+          // 重新加载（因为保存后 id/published 可能变了）
+          // 但重新加载会丢勾选状态，所以这里只更新 _raw
+        }
+      })
+      .catch(err => alert('保存异常：' + err.message));
+  }
+
+  function savePredPublish(pubEntry) {
+    const raw = JSON.parse(JSON.stringify(pubEntry._raw || {}));
+    raw.published = pubEntry.published;
+    if (!raw.rule_id) raw.rule_id = pubEntry.rule_id;
+    if (!raw.name) raw.name = pubEntry.name;
+
+    fetch(API + '/api/predictions/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(raw)
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) alert('保存失败');
+        else pubEntry._raw = raw;
+      })
+      .catch(err => alert('保存异常：' + err.message));
+  }
+
+  function previewPublish() {
+    const status = document.getElementById('pubStatus');
+    if (status) { status.className = 'pub-status info'; status.textContent = '正在生成预览...'; }
+
+    const ver = state.dataVersion || '';
+    fetch(API + '/api/publish/preview?data_version=' + encodeURIComponent(ver))
+      .then(r => r.json())
+      .then(data => {
+        state.publishPreview = data;
+        state.publishPreviewTab = 'maps';
+        render();
+        const s2 = document.getElementById('pubStatus');
+        if (s2) {
+          s2.className = 'pub-status ok';
+          s2.textContent = '✓ 预览已生成：地图 ' + data.maps.length + ' 个，预测规则 ' + data.predictions.length + ' 条';
+        }
+      })
+      .catch(err => {
+        const s2 = document.getElementById('pubStatus');
+        if (s2) { s2.className = 'pub-status err'; s2.textContent = '✗ 预览失败：' + err.message; }
+      });
+  }
+
+  function exportJson(filename, content) {
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  // ---------- 通用 ----------
+  function renderGeneral() {
+    const c = state.config;
+    return `
+      <div class="group">
+        <h2>界面</h2>
+        ${fieldCheckbox('ui.show_player_name', '显示角色名',
+            '默认隐藏为 "挖宝小助手@隐"，防止截图暴露名字')}
+        ${fieldCheckbox('money_unit_wan', '金币用"万"显示',
+            '勾选后系统金收入除以 10000 显示')}
+      </div>
+
+      <div class="group">
+        <h2>悬浮窗服务器</h2>
+        ${fieldNumberWithDefault('ui.overlay_port', 'HTTP/WebSocket 端口', 8765, '默认 8765，改完需重载插件')}
+        ${fieldCheckboxWithDefault('ui.overlay_enabled', '启用悬浮窗服务器', true,
+            '关闭后 settings/history/overlay 页面都无法访问')}
+      </div>
+
+      <div class="group">
+        <h2>版本更新</h2>
+        ${fieldCheckbox('ui.auto_check_update', '启动时自动检查更新', '')}
+      </div>
+    `;
+  }
+
+  // ---------- 识别规则 ----------
+  // 这两条关键词决定能不能统计到「地图完成」和「魔纹出现」，
+  // 留空会导致功能静默失效（能打宝但地图数一直是 0）。
+  function renderDetection() {
+    return `
+      <div class="group">
+        <h2>⚠ 关键识别规则</h2>
+        <div style="color:#c8a24a;font-size:13px;line-height:1.8;margin-bottom:14px">
+          这两项为空会导致<strong>地图完成、魔纹出现统计不到</strong>（表现为能正常打宝，
+          但"已挖地图数"一直是 0）。修改后需回插件主界面点"重载配置"生效。
+        </div>
+
+        ${fieldTextarea('detection.map_complete_keyword', '地图完成关键词',
+            '将陷阱引来的魔物全部打倒了！，“运河宝物库深层”任务开始。', 300,
+            'detection.map_complete_keyword',
+            '游戏原文的标点/空格有细微差异都会导致匹配失败，请从 ACT 日志里原样复制')}
+
+        ${fieldTextarea('detection.magic_seal_keyword', '魔纹出现关键词',
+            '通往宝物库的传送魔纹出现了！', 300,
+            'detection.magic_seal_keyword')}
+
+        <div style="color:#808080;font-size:13px;line-height:1.8;margin-top:10px">
+          · 多个关键词用英文逗号 <code>,</code> 或中文逗号 <code>，</code> 分隔，命中任意一个即算<br>
+          · 匹配方式是"内容包含关键词"，不需要配整句<br>
+          · 怎么看游戏原文：在 ACT 的日志窗口找到对应行，或勾选通用页的"输出 Debug 日志"
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>识别行为</h2>
+        ${fieldCheckboxWithDefault('detection.auto_single_mode', '自动检测单人/组队',
+            true, '按队伍人数自动切换：>1 人组队，≤1 人单人')}
+        ${fieldCheckbox('detection.single_player_mode', '单人挖宝模式',
+            '单人时只记录 083E（直接进背包）；组队记录 0039（ROLL 点获得）')}
+      </div>
+
+      <div class="group">
+        <h2>排查</h2>
+        <div style="color:#808080;font-size:13px;line-height:1.8">
+          · 打完一张图，"已挖地图数"没变化 → 先检查上面的地图完成关键词<br>
+          · 关键词看起来没错但仍不统计 → 在通用页开启 Debug 日志，把日志里
+            含「陷阱」「魔物」「任务开始」的行发出来对一下原文<br>
+          · 点击"填入默认值"可恢复成官方默认关键词
+        </div>
+      </div>
+    `;
+  }
+
+  function bindDetectionEvents() {
+    document.querySelectorAll('[data-reset-default]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const path = btn.dataset.resetDefault;
+        const input = document.querySelector('[data-path="' + path + '"]');
+        if (!input) return;
+
+        fetch(API + '/api/config/defaults')
+          .then(r => r.json())
+          .then(def => {
+            const keys = path.split('.');
+            let cur = def;
+            for (let i = 0; i < keys.length; i++) {
+              if (cur === undefined || cur === null) { cur = undefined; break; }
+              cur = cur[keys[i]];
+            }
+            if (cur === undefined || cur === null || cur === '') {
+              showStatus('未取到默认值', 'error');
+              return;
+            }
+            input.value = cur;
+            setConfig(path, cur);
+            state.dirty = true;
+            updateSaveButton();
+            showStatus('已填入默认值，记得点"保存本页"', 'dirty');
+          })
+          .catch(() => showStatus('读取默认值失败（插件可能未启动）', 'error'));
+      });
+    });
+  }
+
+  // ---------- 鲶鱼精 ----------
+  function renderPostnamazu() {
+    return `
+      <div class="group">
+        <h2>鲶鱼精邮差</h2>
+        ${fieldCheckbox('postnamazu.enabled', '启用鲶鱼精发送',
+            '关闭后 /e /p 命令不会发送')}
+        ${fieldNumber('postnamazu.port', 'HTTP 端口',
+            '鲶鱼精 HTTP 服务器端口，默认 2019')}
+      </div>
+
+      <div class="group">
+        <h2>说明</h2>
+        <div style="color:#808080;font-size:13px;line-height:1.8">
+          · 修改端口后需回插件主界面重载配置<br>
+          · 端口必须与鲶鱼精插件里"HTTP 服务器"端口一致<br>
+          · 测试方法：浏览器打开 http://127.0.0.1:端口/command<br>
+          · 若返回 405/404 说明端口连通；连接被拒绝则鲶鱼精未启动
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------- 通知 ----------
+  function renderNotification() {
+    return `
+      <div class="group">
+        <h2>Windows 通知</h2>
+        ${fieldCheckbox('notification.enabled', '启用 Windows 通知',
+            '总开关，关闭后以下全部失效')}
+      </div>
+
+      <div class="group">
+        <h2>通知类型</h2>
+        ${fieldCheckbox('notification.summary_enabled', '成果发送通知',
+            '发送汇总后弹出通知')}
+        ${fieldCheckbox('notification.trigger_enabled', '触发器动作通知',
+            '触发器规则执行时通知')}
+        ${fieldCheckbox('notification.prediction_enabled', '预测功能通知',
+            '预测成功/失败时通知')}
+      </div>
+    `;
+  }
+
+  // ---------- 分段 ----------
+  function renderSegment() {
+    return `
+      <div class="group">
+        <h2>自动分段</h2>
+        ${fieldCheckbox('auto_segment.enabled', '启用自动分段',
+            '收到指定消息后自动创建分段')}
+        ${fieldText('auto_segment.message_code', '消息码', '默认 00', '60')}
+        ${fieldText('auto_segment.type_code', '类型码（可空）', '如 0038', '60')}
+        ${fieldText('auto_segment.keyword', '关键词', '如 挖宝会计分段', '200')}
+      </div>
+
+      <div class="group">
+        <h2>自动发送 · 默语</h2>
+        ${fieldCheckbox('auto_send.tell_enabled', '启用默语自动发送', '')}
+        ${fieldText('auto_send.tell_text', '检测文本', '如 挖宝会计', '200')}
+        ${fieldText('auto_send.tell_type', '检测类型码', '格式 0038/默语', '60')}
+      </div>
+
+      <div class="group">
+        <h2>自动发送 · 小队</h2>
+        ${fieldCheckbox('auto_send.party_enabled', '启用小队自动发送', '')}
+        ${fieldText('auto_send.party_text', '检测文本', '如 挖宝会计小队', '200')}
+        ${fieldText('auto_send.party_type', '检测类型码', '格式 000E/小队', '60')}
+      </div>
+    `;
+  }
+
+  // ---------- 字段生成辅助 ----------
+  function fieldCheckbox(path, label, hint) {
+    const v = getConfig(path, false);
+    return `
+      <div class="field">
+        <label>${escapeHtml(label)}</label>
+        <div class="control">
+          <label class="checkbox-wrap">
+            <input type="checkbox" data-path="${escapeHtml(path)}" ${v ? 'checked' : ''}>
+            <span>${v ? '已启用' : '已禁用'}</span>
+          </label>
+        </div>
+        ${hint ? '<div></div><div class="hint" style="grid-column:2">' + escapeHtml(hint) + '</div>' : ''}
+      </div>
+    `;
+  }
+
+  function fieldCheckboxWithDefault(path, label, defaultValue, hint) {
+    let v = getConfig(path, defaultValue);
+    if (v === null || v === undefined) v = defaultValue;
+    return `
+      <div class="field">
+        <label>${escapeHtml(label)}</label>
+        <div class="control">
+          <label class="checkbox-wrap">
+            <input type="checkbox" data-path="${escapeHtml(path)}" ${v ? 'checked' : ''}>
+            <span>${v ? '已启用' : '已禁用'}</span>
+          </label>
+        </div>
+        ${hint ? '<div></div><div class="hint" style="grid-column:2">' + escapeHtml(hint) + '</div>' : ''}
+      </div>
+    `;
+  }
+
+  function fieldNumber(path, label, hint) {
+    const v = getConfig(path, 0);
+    return `
+      <div class="field">
+        <label>${escapeHtml(label)}</label>
+        <div class="control">
+          <input type="number" data-path="${escapeHtml(path)}" value="${v}">
+        </div>
+        ${hint ? '<div></div><div class="hint" style="grid-column:2">' + escapeHtml(hint) + '</div>' : ''}
+      </div>
+    `;
+  }
+  function fieldNumberWithDefault(path, label, defaultValue, hint) {
+    let v = getConfig(path, defaultValue);
+    if (v === null || v === undefined || v === '') v = defaultValue;
+    return `
+      <div class="field">
+        <label>${escapeHtml(label)}</label>
+        <div class="control">
+          <input type="number" data-path="${escapeHtml(path)}" value="${v}">
+        </div>
+        ${hint ? '<div></div><div class="hint" style="grid-column:2">' + escapeHtml(hint) + '</div>' : ''}
+      </div>
+    `;
+  }
+
+  function fieldText(path, label, placeholder, maxlen) {
+    const v = getConfig(path, '');
+    return `
+      <div class="field">
+        <label>${escapeHtml(label)}</label>
+        <div class="control">
+          <input type="text" data-path="${escapeHtml(path)}"
+                 value="${escapeHtml(v)}"
+                 placeholder="${escapeHtml(placeholder || '')}"
+                 maxlength="${maxlen || 200}">
+        </div>
+      </div>
+    `;
+  }
+
+  // 多行文本：用于关键词这类可能很长的游戏原文
+  // resetPath 有值时，在文本框下方附一个「填入默认值」按钮（从 /api/config/defaults 取）
+  function fieldTextarea(path, label, placeholder, maxlen, resetPath, hint) {
+    let v = getConfig(path, '');
+    if (v === null || v === undefined) v = '';
+    const resetBtn = resetPath
+      ? '<button type="button" class="btn" data-reset-default="' + escapeHtml(resetPath) + '">填入默认值</button>'
+      : '';
+    const hintHtml = hint
+      ? '<span style="color:#808080;font-size:12px;line-height:1.5">' + escapeHtml(hint) + '</span>'
+      : '';
+    return `
+      <div class="field" style="align-items:start">
+        <label style="padding-top:8px">${escapeHtml(label)}</label>
+        <div class="control" style="display:flex;flex-direction:column;align-items:stretch;gap:8px">
+          <textarea data-path="${escapeHtml(path)}"
+                    rows="3"
+                    spellcheck="false"
+                    placeholder="${escapeHtml(placeholder || '')}"
+                    maxlength="${maxlen || 500}"
+                    style="width:100%;box-sizing:border-box;resize:vertical;
+                           font-family:inherit;font-size:13px;line-height:1.6;
+                           padding:8px 10px;border-radius:6px;
+                           border:1px solid #3a3a3a;background:#1e1e1e;color:#f0d080"
+          >${escapeHtml(v)}</textarea>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            ${resetBtn}${hintHtml}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ============ 输入事件 ============
+  function bindInputEvents() {
+    document.querySelectorAll('[data-path]').forEach(el => {
+      const path = el.dataset.path;
+      const isCheckbox = el.type === 'checkbox';
+
+      const handler = () => {
+        let value;
+        if (isCheckbox) value = el.checked;
+        else if (el.type === 'number') value = parseFloat(el.value) || 0;
+        else value = el.value;
+
+        setConfig(path, value);
+        state.dirty = true;
+        updateSaveButton();
+
+        // checkbox 文本同步
+        if (isCheckbox) {
+          const span = el.parentElement.querySelector('span');
+          if (span) span.textContent = el.checked ? '已启用' : '已禁用';
+        }
+      };
+
+      el.addEventListener('change', handler);
+      if (!isCheckbox) el.addEventListener('input', handler);
+    });
+  }
+
+  // ============ 保存按钮状态 ============
+  function updateSaveButton() {
+    const btn = document.getElementById('btnSave');
+    const status = document.getElementById('saveStatus');
+
+    // 有专属保存按钮的页面，禁用底部的通用保存
+    if (state.currentTab === 'maps') {
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = '（地图页请使用地图内的"保存本地图"按钮）';
+      return;
+    }
+    if (state.currentTab === 'predictions') {
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = '（预测规则页请使用"保存本规则"按钮）';
+      return;
+    }
+    if (state.currentTab === 'rules') {
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = '（触发器规则页请使用"保存本规则"按钮）';
+      return;
+    }
+    if (state.currentTab === 'ie') {
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = '';
+      return;
+    }
+
+    if (state.currentTab === 'publish') {
+      btn.disabled = true;
+      status.className = '';
+      status.textContent = '（发布管理页无需底部保存按钮）';
+      return;
+    }
+
+    btn.disabled = !state.dirty;
+    if (state.dirty) {
+      status.className = 'dirty';
+      status.textContent = '● 有未保存的修改';
+    } else {
+      status.className = '';
+      status.textContent = '';
+    }
+  }
+
+  // ============ 保存 ============
+  function saveCurrentPage() {
+    const items = [];
+    document.querySelectorAll('[data-path]').forEach(el => {
+      const path = el.dataset.path;
+      let value;
+      if (el.type === 'checkbox') value = el.checked;
+      else if (el.type === 'number') value = parseFloat(el.value) || 0;
+      else value = el.value;
+      items.push({ path: path, value: value });
+    });
+
+    if (items.length === 0) {
+      showStatus('本页没有可保存的字段', 'dirty');
+      return;
+    }
+
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    showStatus('保存中...', 'dirty');
+
+    fetch(API + '/api/config/batch-set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ items: items })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          state.dirty = false;
+          state.savedConfig = JSON.parse(JSON.stringify(state.config));
+          showStatus('✓ 已保存 ' + (res.count || items.length) + ' 项（回主界面点"重载配置"生效）', '');
+          updateSaveButton();
+        } else {
+          showStatus('保存失败：' + (res.error || '未知错误'), 'error');
+          btn.disabled = false;
+        }
+      })
+      .catch(err => {
+        showStatus('保存异常：' + err.message, 'error');
+        btn.disabled = false;
+      });
+  }
+
+  function showStatus(text, cls) {
+    const s = document.getElementById('saveStatus');
+    s.className = cls || '';
+    s.textContent = text;
+    if (cls !== 'dirty') {
+      setTimeout(() => {
+        if (s.textContent === text) {
+          s.textContent = '';
+          s.className = '';
+        }
+      }, 5000);
+    }
+  }
+
+  // ============ 重载 ============
+  function reloadAll() {
+    if (!confirm('重载会放弃未保存的修改，确定继续？')) return;
+    showStatus('重载中...', 'dirty');
+    fetch(API + '/api/config/reload', { method: 'POST' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          showStatus('✓ 已重载', '');
+          loadConfig();
+        } else {
+          showStatus('重载失败：' + (res.error || ''), 'error');
+        }
+      })
+      .catch(err => showStatus('重载异常：' + err.message, 'error'));
+  }
+
+  // ============ 初始化 ============
+  function init() {
+    // 侧边栏点击
+    document.querySelectorAll('#nav a').forEach(a => {
+      a.addEventListener('click', () => {
+        if (state.dirty && state.currentTab !== a.dataset.tab) {
+          if (!confirm('当前页有未保存的修改，切换会丢失，确定继续？')) return;
+        }
+        state.currentTab = a.dataset.tab;
+        state.dirty = false;
+        render();
+      });
+    });
+
+    // 保存 & 重载
+    document.getElementById('btnSave').addEventListener('click', saveCurrentPage);
+    document.getElementById('btnReload').addEventListener('click', reloadAll);
+
+    // 离开提示
+    window.addEventListener('beforeunload', e => {
+      if (state.dirty || state.mapDirty || state.predDirty || state.ruleDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // 加载
+    loadConfig();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

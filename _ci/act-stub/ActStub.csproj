@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CI 专用的 ACT 引用桩。
+    产出文件名必须是 `Advanced Combat Tracker.exe`，以便和真实 ACT 的
+    HintPath 一致；程序集身份（名称/版本/公钥标记）也与真实 ACT 相同。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <!-- 关键：输出文件名与真实 ACT 一致 -->
+    <AssemblyName>Advanced Combat Tracker</AssemblyName>
+    <TargetExt>.exe</TargetExt>
+    <RootNamespace>Advanced_Combat_Tracker</RootNamespace>
+
+    <!-- 与真实 ACT 3.8.5.288 完全一致的身份 -->
+    <AssemblyVersion>3.8.5.288</AssemblyVersion>
+    <FileVersion>3.8.5.288</FileVersion>
+    <InformationalVersion>3.8.5.288</InformationalVersion>
+
+    <!-- 用 ACT 的公钥签名：只保证 PublicKeyToken 一致，不含私钥 -->
+    <SignAssembly>true</SignAssembly>
+    <PublicSign>true</PublicSign>
+    <AssemblyOriginatorKeyFile>act-public.snk</AssemblyOriginatorKeyFile>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <NoWarn>CS0067</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <!--
+    自带 .NET Framework 参考程序集：不依赖 runner 上是否安装了
+    net472 Targeting Pack，让 stub 在哪都能编过。
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

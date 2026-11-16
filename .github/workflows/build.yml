@@ -1,0 +1,127 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# 发布 Release 需要写权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (Release x64)
+    # windows-2022 已内置 .NET Framework 4.7.2 Targeting Pack，无需额外安装。
+    # 如需跟随最新镜像可改为 windows-latest（2025 镜像同样自带 4.7.2 目标包）。
+    runs-on: windows-2022
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: 安装 NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 还原 NuGet 包
+        run: nuget restore FF14TreasureHunterACT.sln
+
+      # 编译需要引用 ACT 的 exe，但 ACT 不在仓库里（体积大、不宜分发），
+      # 官网也无法稳定下载。所以用 _ci/act-stub 生成一个「身份相同」的引用桩。
+      - name: 构建 ACT 引用桩
+        run: dotnet build _ci/act-stub/ActStub.csproj -c Release -v:minimal
+
+      - name: 编译插件
+        run: >
+          msbuild FF14TreasureHunterACT.sln
+          /t:Rebuild
+          /p:Configuration=Release
+          /p:Platform=x64
+          /p:ActDir="${{ github.workspace }}\_ci\act-stub\bin\Release\net472"
+          /v:minimal
+          /nologo
+
+      - name: 校验产物与引用完整性
+        shell: pwsh
+        run: |
+          $dll = "FF14TreasureHunterACT\bin\x64\Release\FF14TreasureHunterACT.dll"
+          if (-not (Test-Path $dll)) { Write-Error "未找到编译产物"; exit 1 }
+
+          $asm = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll))
+          Write-Host "程序集版本: $($asm.Version)"
+
+          # 关键校验：对 ACT 的引用必须是真实 ACT 的身份，
+          # 否则插件在真实 ACT 中会绑定失败（stub 只是编译期替身）
+          $ref = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom((Resolve-Path $dll)).GetReferencedAssemblies() |
+                 Where-Object { $_.Name -eq 'Advanced Combat Tracker' }
+          if (-not $ref) { Write-Error "产物中没有 ACT 引用"; exit 1 }
+          Write-Host "ACT 引用: $ref"
+          if ($ref.FullName -notmatch 'PublicKeyToken=a946b61e93d97868') {
+            Write-Error "ACT 引用缺少正确的强名称公钥标记，产物将无法加载"
+            exit 1
+          }
+          Write-Host "✓ 引用校验通过"
+
+      # 仅打 tag 时校验 tag 与程序集版本一致，避免发错版本
+      - name: 校验 tag 与程序集版本一致
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $dll = "FF14TreasureHunterACT\bin\x64\Release\FF14TreasureHunterACT.dll"
+          $asmVer = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll)).Version.ToString()
+          $tagVer = "${{ github.ref_name }}".TrimStart('v')
+          Write-Host "tag=$tagVer / 程序集=$asmVer"
+          if ($asmVer -ne $tagVer) {
+            Write-Error "tag 与 AssemblyInfo.cs 中的版本不一致：tag=$tagVer, 程序集=$asmVer。请先修改 AssemblyVersion 再打 tag。"
+            exit 1
+          }
+
+      - name: 打包网页文件
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: Compress-Archive -Path web\* -DestinationPath web-pages.zip -Force
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: FF14TreasureHunterACT-${{ github.ref_name }}
+          path: |
+            FF14TreasureHunterACT/bin/x64/Release/FF14TreasureHunterACT.dll
+            web-pages.zip
+          if-no-files-found: error
+
+      - name: 创建或更新 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $dll = "FF14TreasureHunterACT\bin\x64\Release\FF14TreasureHunterACT.dll"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Release $tag 不存在，创建中..."
+            gh release create $tag --title "挖宝会计 $tag" --generate-notes
+          } else {
+            Write-Host "Release $tag 已存在，将覆盖附件"
+          }
+
+          gh release upload $tag $dll --clobber
+          if (Test-Path web-pages.zip) {
+            gh release upload $tag web-pages.zip --clobber
+          }
+
+          Write-Host "✓ Release 发布完成"
+          gh release view $tag

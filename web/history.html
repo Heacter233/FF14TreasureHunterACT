@@ -1,0 +1,531 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>挖宝会计 - 历史记录</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #1e1e1e;
+    color: #d0d0d0;
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  .layout {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* ---- 左侧 ---- */
+  .sidebar {
+    width: 180px;
+    background: #252525;
+    border-right: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-header {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+  }
+  .sidebar-header select {
+    width: 100%;
+    background: #2a2a2a;
+    color: #f0d080;
+    border: 1px solid #3a3a3a;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  .date-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .date-item {
+    padding: 6px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: #c0c0c0;
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
+  .date-item:hover {
+    background: #2f2f2f;
+  }
+  .date-item.active {
+    background: #3d3d2a;
+    color: #f0d080;
+    font-weight: bold;
+  }
+
+  /* ---- 右侧 ---- */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .tabs {
+    display: flex;
+    background: #252525;
+    border-bottom: 1px solid #333;
+  }
+  .tab {
+    padding: 8px 18px;
+    cursor: pointer;
+    color: #a09070;
+    border-bottom: 2px solid transparent;
+    font-size: 13px;
+  }
+  .tab:hover { background: #2a2a2a; }
+  .tab.active {
+    color: #f0d080;
+    border-bottom-color: #c0a050;
+    background: #2a2a2a;
+  }
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+  }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* ---- 通用样式 ---- */
+  h3 {
+    color: #c0a050;
+    font-size: 13px;
+    margin: 12px 0 6px 0;
+    font-weight: bold;
+  }
+  h3:first-child { margin-top: 0; }
+  .empty {
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+    text-align: center;
+  }
+
+  /* ---- 物品列表 ---- */
+  .map-group {
+    color: #a0d0a0;
+    font-weight: bold;
+    margin: 10px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px dashed #3a3a3a;
+  }
+  .item-row {
+    padding: 2px 0 2px 12px;
+    color: #d0d0d0;
+  }
+  .item-row .qty { color: #f0d080; }
+
+  /* ---- 时间线 ---- */
+  .timeline-row {
+    padding: 3px 0;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    gap: 8px;
+  }
+  .timeline-row .time {
+    color: #808080;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    min-width: 70px;
+  }
+  .timeline-row .icon { min-width: 18px; }
+  .timeline-row .text { flex: 1; }
+  .timeline-row.loot .text { color: #a0d0a0; }
+  .timeline-row.layer .text { color: #d0a0d0; }
+  .timeline-row.map_complete .text { color: #80c0e0; }
+  .timeline-row.magic_seal .text { color: #f0d080; font-weight: bold; }
+  .timeline-row.custom .text { color: #d0c0a0; }
+  .vault-tag {
+    color: #a0c0f0;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+
+  /* ---- 汇总卡片 ---- */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-card {
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    padding: 8px 12px;
+  }
+  .stat-card .label {
+    color: #a09070;
+    font-size: 12px;
+  }
+  .stat-card .value {
+    color: #f0d080;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 2px;
+  }
+  .stat-card .value.good { color: #90d090; }
+  .stat-card .value.bad  { color: #e08080; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 左侧：日期选择 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <select id="monthSelect"></select>
+    </div>
+    <div class="date-list" id="dateList"></div>
+  </div>
+
+  <!-- 右侧：标签页 -->
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" data-tab="summary">汇总</div>
+      <div class="tab" data-tab="items">物品</div>
+      <div class="tab" data-tab="layers">层级/其他</div>
+      <div class="tab" data-tab="timeline">时间线</div>
+    </div>
+    <div class="content">
+      <div class="pane active" id="pane-summary"></div>
+      <div class="pane" id="pane-items"></div>
+      <div class="pane" id="pane-layers"></div>
+      <div class="pane" id="pane-timeline"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  // 自适应：http 下用相对路径；file:// 下用 127.0.0.1
+  const API_BASE = (location.protocol === 'http:' && location.host)
+                    ? ''
+                    : 'http://127.0.0.1:8765';
+
+  // token 附加参数
+  const TOKEN = (typeof window.__LAN_TOKEN__ !== 'undefined') ? window.__LAN_TOKEN__ : '';
+  const TQ = TOKEN ? ('t=' + encodeURIComponent(TOKEN)) : '';
+
+  function apiUrl(path) {
+    if (!TQ) return API_BASE + path;
+    return API_BASE + path + (path.indexOf('?') >= 0 ? '&' : '?') + TQ;
+  }
+
+  let allDates = [];
+  let currentMonth = '';
+  let currentDate = '';
+  let currentTab = 'summary';
+  let timelineData = [];
+
+  // ---------- 初始化 ----------
+  function init() {
+    bindTabs();
+    loadDates();
+  }
+
+  function bindTabs() {
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.pane').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        currentTab = t.dataset.tab;
+        document.getElementById('pane-' + currentTab).classList.add('active');
+        renderCurrent();
+      });
+    });
+  }
+
+  function loadDates() {
+    fetch(apiUrl('/api/history/dates'))
+      .then(r => r.json())
+      .then(d => {
+        allDates = d.dates || [];
+        if (allDates.length === 0) {
+          document.getElementById('dateList').innerHTML =
+            '<div class="empty">暂无历史数据</div>';
+          return;
+        }
+        buildMonthSelect();
+        // 默认选中最新日期
+        selectDate(allDates[0]);
+      })
+      .catch(err => {
+        document.getElementById('dateList').innerHTML =
+          '<div class="empty">加载失败：' + err.message + '</div>';
+      });
+  }
+
+  function buildMonthSelect() {
+    const months = [];
+    const seen = new Set();
+    allDates.forEach(d => {
+      const m = d.substring(0, 7);
+      if (!seen.has(m)) { seen.add(m); months.push(m); }
+    });
+    const sel = document.getElementById('monthSelect');
+    sel.innerHTML = months.map(m => {
+      const [y, mo] = m.split('-');
+      return '<option value="' + m + '">' + y + ' 年 ' + mo + ' 月</option>';
+    }).join('');
+    sel.onchange = () => {
+      currentMonth = sel.value;
+      renderDateList();
+    };
+    currentMonth = months[0];
+    sel.value = currentMonth;
+    renderDateList();
+  }
+
+  function renderDateList() {
+    const filtered = allDates.filter(d => d.startsWith(currentMonth));
+    const list = document.getElementById('dateList');
+    list.innerHTML = filtered.map(d =>
+      '<div class="date-item' + (d === currentDate ? ' active' : '') +
+      '" data-date="' + d + '">' + d + '</div>'
+    ).join('');
+    list.querySelectorAll('.date-item').forEach(el => {
+      el.addEventListener('click', () => selectDate(el.dataset.date));
+    });
+  }
+
+  function selectDate(date) {
+    currentDate = date;
+    renderDateList();
+    loadTimeline(date);
+  }
+
+  function loadTimeline(date) {
+    fetch(apiUrl('/api/history/timeline?date=' + encodeURIComponent(date)))
+      .then(r => r.json())
+      .then(d => {
+        timelineData = d.timeline || [];
+        renderCurrent();
+      })
+      .catch(err => {
+        timelineData = [];
+        renderCurrent();
+      });
+  }
+
+  function renderCurrent() {
+    switch (currentTab) {
+      case 'summary':  renderSummary(); break;
+      case 'items':    renderItems(); break;
+      case 'layers':   renderLayers(); break;
+      case 'timeline': renderTimeline(); break;
+    }
+  }
+
+  // ---------- 汇总 ----------
+  function renderSummary() {
+    if (!currentDate) { empty('summary'); return; }
+
+    let maps = 0, seals = 0, lootCount = 0, layerCount = 0;
+    timelineData.forEach(t => {
+      if (t.type === 'map_complete') maps++;
+      else if (t.type === 'magic_seal') seals++;
+      else if (t.type === 'loot') lootCount += t.value;
+      else if (t.type === 'layer') layerCount++;
+    });
+
+    let html = '<h3>📅 ' + currentDate + '</h3>';
+    html += '<div class="summary-grid">';
+    html += card('已挖地图', maps);
+    html += card('出现魔纹', seals);
+    html += card('魔纹率', maps > 0 ? (seals * 100 / maps).toFixed(1) + '%' : '0%');
+    html += card('物品总数', lootCount);
+    html += card('层级次数', layerCount);
+    html += card('事件总数', timelineData.length);
+    html += '</div>';
+
+    // 按 vault 分组
+    const vaults = {};
+    const noVault = [];
+    timelineData.forEach(t => {
+      if (t.vault_map) {
+        if (!vaults[t.vault_map]) vaults[t.vault_map] = [];
+        vaults[t.vault_map].push(t);
+      } else {
+        noVault.push(t);
+      }
+    });
+
+    if (Object.keys(vaults).length > 0) {
+      html += '<h3>🗺️ 魔纹分组</h3>';
+      Object.keys(vaults).forEach(v => {
+        html += '<div class="map-group">' + escapeHtml(v) +
+                '（' + vaults[v].length + ' 条）</div>';
+      });
+    }
+
+    document.getElementById('pane-summary').innerHTML = html;
+  }
+
+  function card(label, value) {
+    return '<div class="stat-card"><div class="label">' + label +
+           '</div><div class="value">' + value + '</div></div>';
+  }
+
+  // ---------- 物品 ----------
+  function renderItems() {
+    if (!currentDate) { empty('items'); return; }
+
+    const items = timelineData.filter(t => t.type === 'loot');
+    if (items.length === 0) { empty('items'); return; }
+
+    // 按物品名分组
+    const grouped = {};
+    const order = [];
+    items.forEach(t => {
+      const key = t.name;
+      if (!grouped[key]) { grouped[key] = 0; order.push(key); }
+      grouped[key] += t.value;
+    });
+
+    let html = '<h3>📦 ' + currentDate + ' 物品记录</h3>';
+    order.forEach(name => {
+      html += '<div class="item-row">' + escapeHtml(name) +
+              ' <span class="qty">×' + grouped[name] + '</span></div>';
+    });
+
+    document.getElementById('pane-items').innerHTML = html;
+  }
+
+  // ---------- 层级 / 其他 ----------
+  function renderLayers() {
+    if (!currentDate) { empty('layers'); return; }
+
+    const layers = timelineData.filter(t => t.type === 'layer');
+    const customs = timelineData.filter(t => t.type === 'custom');
+
+    if (layers.length === 0 && customs.length === 0) {
+      empty('layers'); return;
+    }
+
+    let html = '<h3>📋 ' + currentDate + '</h3>';
+
+    if (layers.length > 0) {
+      const grouped = {};
+      const order = [];
+      layers.forEach(t => {
+        if (!grouped[t.name]) { grouped[t.name] = 0; order.push(t.name); }
+        grouped[t.name]++;
+      });
+      html += '<div class="map-group">层级记录</div>';
+      order.forEach(name => {
+        html += '<div class="item-row">' + escapeHtml(name) +
+                ' <span class="qty">×' + grouped[name] + '</span></div>';
+      });
+    }
+
+    if (customs.length > 0) {
+      const grouped = {};
+      const order = [];
+      customs.forEach(t => {
+        if (!grouped[t.name]) { grouped[t.name] = 0; order.push(t.name); }
+        grouped[t.name] += t.value;
+      });
+      html += '<div class="map-group">其他记录</div>';
+      order.forEach(name => {
+        html += '<div class="item-row">' + escapeHtml(name) +
+                '：<span class="qty">' + grouped[name] + '</span></div>';
+      });
+    }
+
+    document.getElementById('pane-layers').innerHTML = html;
+  }
+
+  // ---------- 时间线 ----------
+  function renderTimeline() {
+    if (!currentDate || timelineData.length === 0) {
+      empty('timeline'); return;
+    }
+
+    let html = '<h3>⏱️ ' + currentDate + ' 时间线</h3>';
+    timelineData.forEach(t => {
+      const timeStr = extractTime(t.timestamp);
+      let icon = '', text = '', cls = '';
+
+      switch (t.type) {
+        case 'loot':
+          icon = '📦';
+          text = '获得 ' + escapeHtml(t.name) + ' ×' + t.value;
+          cls = 'loot';
+          break;
+        case 'layer':
+          icon = '▶';
+          text = '层级 ' + escapeHtml(t.name);
+          cls = 'layer';
+          break;
+        case 'map_complete':
+          icon = '🗺️';
+          text = '挖宝图完成';
+          cls = 'map_complete';
+          break;
+        case 'magic_seal':
+          icon = '✨';
+          text = '魔纹出现';
+          cls = 'magic_seal';
+          break;
+        case 'custom':
+          icon = '📋';
+          text = escapeHtml(t.name) + ' = ' + t.value;
+          cls = 'custom';
+          break;
+        default:
+          icon = '·';
+          text = t.type;
+      }
+
+      let vaultTag = '';
+      if (t.vault_map) {
+        vaultTag = '<span class="vault-tag">[✨' +
+                   escapeHtml(t.vault_map) + ']</span>';
+      }
+
+      html += '<div class="timeline-row ' + cls + '">' +
+              '<span class="time">' + timeStr + '</span>' +
+              '<span class="icon">' + icon + '</span>' +
+              '<span class="text">' + text + vaultTag + '</span>' +
+              '</div>';
+    });
+
+    document.getElementById('pane-timeline').innerHTML = html;
+  }
+
+  function extractTime(ts) {
+    if (!ts) return '';
+    const t = ts.indexOf('T');
+    if (t < 0) return ts;
+    return ts.substring(t + 1, t + 9);  // HH:mm:ss
+  }
+
+  function empty(paneId) {
+    document.getElementById('pane-' + paneId).innerHTML =
+      '<div class="empty">该日期无记录</div>';
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

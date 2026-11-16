@@ -1,0 +1,91 @@
+name: 识别规则失效
+description: 地图数 / 魔纹数统计不到（游戏提示文字对不上）
+title: "[识别] "
+labels: ["bug", "detection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这是最常见的反馈类型。多数字游戏更新改了提示台词，导致关键词匹配不上。
+
+        **请先看插件启动时的运行日志**，里面有这样两行：
+
+        ```
+        [识别] 地图完成关键词：将陷阱引来的魔物全部打倒了！，……
+        [识别] 魔纹出现关键词：通往宝物库的传送魔纹出现了！
+        ```
+
+        如果这两行是空的或显示「⚠ 关键词为空」，请先去
+        **设置页 → 识别规则** 点「填入默认值」并保存。
+
+  - type: checkboxes
+    id: precheck
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已查看设置页「识别规则」，两个关键词都非空
+          required: true
+        - label: 我已点击「填入默认值」并保存、重载配置后重试
+          required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: 现象
+      options:
+        - 地图完成数不增加
+        - 魔纹出现数不增加
+        - 两者都不增加
+        - 层数/出货统计异常
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: 游戏版本
+      description: 例如 7.5 / 7.51，改了台词通常和版本更新有关
+      placeholder: "7.51"
+    validations:
+      required: true
+
+  - type: textarea
+    id: log-lines
+    attributes:
+      label: 游戏实际提示文字
+      description: |
+        打完一张图时，**ACT 的原始日志**里对应的那一行（不是插件日志）。
+        这是最关键的信息——插件就是拿它去匹配关键词的。
+
+        获取方法：
+        1. 主面板勾选「输出 Debug 日志」
+        2. 打一张图
+        3. 在 `%APPDATA%\\FF14TreasureHunter\\log\\` 里找到最新日志，搜索「陷阱」或「魔纹」
+      render: text
+      placeholder: "[19:00:00.000] ChatLog 00:0839::将陷阱引来的魔物全部打倒了！……"
+    validations:
+      required: true
+
+  - type: textarea
+    id: plugin-log
+    attributes:
+      label: 插件运行日志
+      description: 至少包含 `[识别]` 开头的行
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      placeholder: "1.0.4.4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+    validations:
+      required: false

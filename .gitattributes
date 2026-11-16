@@ -1,0 +1,22 @@
+# 编辑/构建相关统一使用 CRLF（Windows 项目）
+* text=auto eol=crlf
+
+# 源码
+*.cs    text eol=crlf
+*.csproj text eol=crlf
+*.sln   text eol=crlf
+*.config text eol=crlf
+*.resx  text eol=crlf
+*.ps1   text eol=crlf
+*.html  text eol=crlf
+*.json  text eol=crlf
+*.md    text eol=lf
+*.php   text eol=lf
+.gitignore text eol=lf
+LICENSE    text eol=lf
+
+# 二进制
+*.png  binary
+*.dll  binary
+*.pdb  binary
+*.db   binary

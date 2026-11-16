@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用说明 / 常见问题
+    url: https://github.com/Heacter233/FF14TreasureHunterACT#常见问题
+    about: 安装、配置、构建、隐私说明以及高频问题，建议先看 README
+  - name: 讨论与交流
+    url: https://github.com/Heacter233/FF14TreasureHunterACT/discussions
+    about: 使用心得、配置分享、不确定是不是 bug 的问题，欢迎到 Discussions

@@ -1,0 +1,573 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a20">
+<title>挖宝会计</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%;
+    min-height: 100%;
+    background: #16161c;
+    color: #e0d0a0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ===== 顶部统计卡片 ===== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    padding: 8px;
+    background: #1c1c24;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid #2a2a34;
+  }
+  .stat-card {
+    background: #22222c;
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .stat-card .label {
+    color: #887855;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .stat-card .value {
+    color: #f0d080;
+    font-size: 18px;
+    font-weight: bold;
+    line-height: 1.2;
+    word-break: break-all;
+  }
+  .stat-card .value.good { color: #80d080; }
+  .stat-card .value.bad  { color: #e08080; }
+
+  /* 第二行（盈亏 / 成本 / 收入）用大一点的卡片 */
+  .stats-grid.row2 {
+    grid-template-columns: 1fr 1fr;
+    padding-top: 0;
+  }
+
+  /* ===== 分区 ===== */
+  .section {
+    margin: 8px;
+    background: #1c1c24;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sec-header {
+    padding: 10px 14px;
+    background: #25252f;
+    color: #c0a050;
+    font-size: 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #2a2a34;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sec-header .count {
+    color: #6a6a7a;
+    font-size: 13px;
+    font-weight: normal;
+  }
+  .sec-body {
+    padding: 8px 12px;
+  }
+
+  /* ===== 内容项 ===== */
+  .map-group {
+    color: #90c890;
+    font-weight: bold;
+    font-size: 13px;
+    margin: 8px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px dashed #2a2a34;
+  }
+  .map-group:first-child { margin-top: 0; }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid #20202a;
+    font-size: 16px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .name {
+    color: #d8d8d8;
+    word-break: break-all;
+    flex: 1;
+    padding-right: 8px;
+  }
+  .row .qty {
+    color: #f0d080;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .empty {
+    color: #555;
+    font-style: italic;
+    padding: 12px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  /* ===== 底部状态 ===== */
+  .footer {
+    padding: 14px;
+    text-align: center;
+    color: #555;
+    font-size: 12px;
+  }
+  .footer .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e07060;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .footer .dot.online { background: #60e070; }
+  .footer .dot.offline { background: #666; }
+
+  /* ===== 预测通知 ===== */
+  .pred-toast {
+    position: fixed;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%) scale(0.85);
+    min-width: 70%;
+    max-width: 92%;
+    padding: 22px 24px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 9999;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  }
+  .pred-toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .pred-toast.type-success {
+    background: linear-gradient(180deg, #4a8a4a 0%, #2e5c2e 100%);
+    border-color: rgba(160, 230, 160, 0.6);
+  }
+  .pred-toast.type-fail {
+    background: linear-gradient(180deg, #a84848 0%, #6e2a2a 100%);
+    border-color: rgba(240, 160, 160, 0.6);
+  }
+  .pred-toast.type-info {
+    background: linear-gradient(180deg, #6a6a3a 0%, #4a4a2a 100%);
+    border-color: rgba(240, 220, 140, 0.6);
+  }
+  .pred-toast .pred-icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .pred-toast .pred-text {
+    font-size: 16px;
+    font-weight: normal;
+    opacity: 0.95;
+    word-break: break-all;
+  }
+
+  /* ===== 新物品闪烁 ===== */
+  @keyframes flashNew {
+    0%, 100% { background: transparent; }
+    50% { background: rgba(240, 208, 128, 0.15); }
+  }
+  .row.newly { animation: flashNew 1s ease 2; }
+
+  /* ===== 底部工具条 ===== */
+  .tools {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+  }
+  .tool-btn {
+    padding: 8px 16px;
+    background: #22222c;
+    border: 1px solid #3a3a44;
+    border-radius: 8px;
+    color: #a09070;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .tool-btn:active { background: #2a2a34; }
+  .tool-btn.active {
+    background: #3a3220;
+    border-color: #c0a050;
+    color: #f0d080;
+    box-shadow: 0 0 10px rgba(240, 208, 128, 0.3);
+  }
+  .tool-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+  <div class="stats-grid" id="statsGrid"></div>
+  <div class="stats-grid row2" id="statsGrid2"></div>
+
+  <div class="section">
+    <div class="sec-header">
+      <span>📦 物品出货</span>
+      <span class="count" id="cntItems"></span>
+    </div>
+    <div class="sec-body" id="bodyItems">
+      <div class="empty">加载中...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-header">
+      <span>📋 层级 / 其他</span>
+      <span class="count" id="cntLayers"></span>
+    </div>
+    <div class="sec-body" id="bodyLayers">
+      <div class="empty">加载中...</div>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button class="tool-btn" id="btnWakeLock" title="保持屏幕常亮">🔆 常亮</button>
+  </div>
+
+  <div class="footer">
+    <span class="dot offline" id="connDot"></span>
+    <span id="connText">连接中...</span>
+    &nbsp;·&nbsp; <span id="updateTime"></span>
+  </div>
+
+  <div class="pred-toast" id="predToast"></div>
+
+<script>
+(function() {
+  var TOKEN = (typeof window.__LAN_TOKEN__ !== 'undefined') ? window.__LAN_TOKEN__ : '';
+  var host = location.host || ('127.0.0.1:8765');
+  var wsProto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
+  var WS_URL = wsProto + '//' + host + '/ws' + (TOKEN ? ('?t=' + TOKEN) : '');
+
+  var ws = null;
+
+  // 快照：检测新增
+  var lastItemKeys = null;
+  var lastLayerKeys = null;
+  var recentlyAdded = {};      // { "name": 时间戳 }
+
+  // 预测通知队列
+  var predQueue = [];
+  var predBusy = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ============ 渲染 ============
+  function render(data) {
+    // 顶部统计（第一行）
+    var profit = data.profit || 0;
+    var profitCls = profit >= 0 ? 'good' : 'bad';
+
+    var row1 = [
+      { label: '地图', value: data.maps || 0 },
+      { label: '魔纹', value: data.magic_seals || 0 },
+      { label: '魔纹率', value: (data.maps > 0 ? (data.magic_seals / data.maps * 100).toFixed(0) : '0') + '%' }
+    ];
+    $('statsGrid').innerHTML = row1.map(function(s) {
+      return '<div class="stat-card"><div class="label">' + s.label +
+             '</div><div class="value">' + escapeHtml(String(s.value)) + '</div></div>';
+    }).join('');
+
+    // 第二行：盈亏 / 系统金
+    var row2 = [
+      { label: '盈亏', value: profit.toFixed(0), cls: profitCls },
+      { label: '系统金', value: ((data.system_gold || 0) / 10000).toFixed(2) + '万', cls: '' }
+    ];
+    $('statsGrid2').innerHTML = row2.map(function(s) {
+      return '<div class="stat-card"><div class="label">' + s.label +
+             '</div><div class="value ' + s.cls + '">' + escapeHtml(String(s.value)) + '</div></div>';
+    }).join('');
+
+    // 物品
+    renderItems(data.items || []);
+
+    // 层级 + 其他
+    renderLayers(data.layers || [], data.customs || []);
+
+    // 预测通知
+    if (data.notifications && data.notifications.length > 0) {
+      for (var n = 0; n < data.notifications.length; n++) {
+        var note = data.notifications[n];
+        enqueuePred(note.type || 'info', note.text || '');
+      }
+    }
+
+    // 更新时间
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var ss = String(now.getSeconds()).padStart(2, '0');
+    $('updateTime').textContent = hh + ':' + mm + ':' + ss + ' 更新';
+  }
+
+  function renderItems(items) {
+    // 检测新增
+    var curKeys = {};
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      curKeys[(it.map || '?') + '|' + (it.name || '?')] = it;
+    }
+    var newOnes = [];
+    if (lastItemKeys !== null) {
+      for (var k in curKeys) {
+        if (!lastItemKeys[k]) newOnes.push(curKeys[k]);
+      }
+    }
+    lastItemKeys = curKeys;
+
+    // 标记"刚出现"的名字
+    var now = Date.now();
+    for (var n = 0; n < newOnes.length; n++) {
+      recentlyAdded['I|' + newOnes[n].name] = now;
+    }
+
+    // 分组
+    var groups = {}, order = [];
+    for (var j = 0; j < items.length; j++) {
+      var it2 = items[j];
+      var m = it2.map || '未知';
+      if (!groups[m]) { groups[m] = []; order.push(m); }
+      groups[m].push(it2);
+    }
+
+    var html = '';
+    if (order.length === 0) {
+      html = '<div class="empty">暂无物品</div>';
+    } else {
+      for (var g = 0; g < order.length; g++) {
+        var mName = order[g];
+        html += '<div class="map-group">==== ' + escapeHtml(mName) + ' ====</div>';
+        var list = groups[mName];
+        for (var x = 0; x < list.length; x++) {
+          var added = recentlyAdded['I|' + list[x].name];
+          var cls = (added && (now - added) < 3000) ? ' newly' : '';
+          html += '<div class="row' + cls + '"><span class="name">' +
+                  escapeHtml(list[x].name) + '</span><span class="qty">×' +
+                  list[x].qty + '</span></div>';
+        }
+      }
+    }
+    $('bodyItems').innerHTML = html;
+    $('cntItems').textContent = items.length > 0 ? items.length + ' 项' : '';
+  }
+
+  function renderLayers(layers, customs) {
+    // 检测新增层级
+    var curKeys = {};
+    for (var i = 0; i < layers.length; i++) {
+      curKeys['L|' + (layers[i].name || '?')] = layers[i];
+    }
+    var newOnes = [];
+    if (lastLayerKeys !== null) {
+      for (var k in curKeys) {
+        if (!lastLayerKeys[k]) newOnes.push(curKeys[k]);
+      }
+    }
+    lastLayerKeys = curKeys;
+
+    var now = Date.now();
+    for (var n = 0; n < newOnes.length; n++) {
+      recentlyAdded['L|' + newOnes[n].name] = now;
+    }
+
+    var html = '';
+    var totalCount = layers.length + customs.length;
+
+    for (var j = 0; j < layers.length; j++) {
+      var added = recentlyAdded['L|' + layers[j].name];
+      var cls = (added && (now - added) < 3000) ? ' newly' : '';
+      html += '<div class="row' + cls + '"><span class="name">层级：' +
+              escapeHtml(layers[j].name) + '</span><span class="qty">×' +
+              layers[j].count + '</span></div>';
+    }
+
+    if (customs.length > 0) {
+      if (layers.length > 0) {
+        html += '<div class="map-group">--- 其他记录 ---</div>';
+      }
+      for (var c = 0; c < customs.length; c++) {
+        html += '<div class="row"><span class="name">' +
+                escapeHtml(customs[c].name) + '</span><span class="qty">' +
+                customs[c].total + '</span></div>';
+      }
+    }
+
+    if (totalCount === 0) {
+      html = '<div class="empty">暂无记录</div>';
+    }
+
+    $('bodyLayers').innerHTML = html;
+    $('cntLayers').textContent = totalCount > 0 ? totalCount + ' 项' : '';
+  }
+
+  // ============ 预测通知 ============
+  function enqueuePred(type, text) {
+    predQueue.push({ type: type, text: text });
+    if (!predBusy) showNextPred();
+  }
+
+  function showNextPred() {
+    if (predQueue.length === 0) { predBusy = false; return; }
+    predBusy = true;
+    var p = predQueue.shift();
+
+    var el = $('predToast');
+    var cls = 'pred-toast';
+    var icon = 'ℹ';
+    if (p.type === 'success') { cls += ' type-success'; icon = '✓'; }
+    else if (p.type === 'fail') { cls += ' type-fail'; icon = '✗'; }
+    else { cls += ' type-info'; }
+
+    el.className = cls;
+    el.innerHTML = '<span class="pred-icon">' + icon + '</span>' +
+                   '<span class="pred-text">' + escapeHtml(p.text) + '</span>';
+
+    setTimeout(function() { el.classList.add('show'); }, 20);
+
+    setTimeout(function() {
+      el.classList.remove('show');
+      setTimeout(function() { showNextPred(); }, 260);
+    }, 3000);
+  }
+
+  // ============ 连接状态 ============
+  function setConn(online) {
+    var dot = $('connDot');
+    var txt = $('connText');
+    if (online) {
+      dot.className = 'dot online';
+      txt.textContent = '已连接';
+    } else {
+      dot.className = 'dot offline';
+      txt.textContent = '连接中断，重连中...';
+    }
+  }
+
+  // ============ WebSocket ============
+  function connect() {
+    try {
+      ws = new WebSocket(WS_URL);
+    } catch (e) {
+      setConn(false);
+      setTimeout(connect, 3000);
+      return;
+    }
+
+    ws.onopen = function() { setConn(true); };
+    ws.onmessage = function(e) {
+      try { render(JSON.parse(e.data)); } catch (err) {}
+    };
+    ws.onclose = function() { setConn(false); setTimeout(connect, 3000); };
+    ws.onerror = function() { try { ws.close(); } catch (e) {} };
+  }
+
+  // ============ 防止双击缩放 ============
+  document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
+
+  // ============ 屏幕常亮（Wake Lock） ============
+  var wakeLock = null;
+  var wakeLockSupported = ('wakeLock' in navigator);
+
+  function updateWakeBtn() {
+    var btn = $('btnWakeLock');
+    if (!wakeLockSupported) {
+      btn.disabled = true;
+      btn.textContent = '🔆 不支持';
+      btn.title = '您的浏览器不支持屏幕常亮 API\n请手动调长息屏时间';
+      return;
+    }
+    if (wakeLock !== null) {
+      btn.classList.add('active');
+      btn.textContent = '🔆 常亮中';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '🔆 常亮';
+    }
+  }
+
+  async function requestWakeLock() {
+    if (!wakeLockSupported) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', function() {
+        // 用户切到后台时浏览器会释放，我们标记一下
+        // 不在这里清理 wakeLock，等重新可见时再 request
+      });
+      updateWakeBtn();
+    } catch (err) {
+      wakeLock = null;
+      updateWakeBtn();
+      alert('开启屏幕常亮失败：' + err.message +
+            '\n\n请手动在系统设置里调长息屏时间。');
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (wakeLock) {
+      try { await wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+      updateWakeBtn();
+    }
+  }
+
+  $('btnWakeLock').addEventListener('click', function() {
+    if (wakeLock !== null) releaseWakeLock();
+    else requestWakeLock();
+  });
+
+  // 页面切回前台时自动重新获取
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && wakeLock !== null) {
+      // 之前开了但被系统释放 → 重新获取
+      requestWakeLock();
+    }
+  });
+
+  updateWakeBtn();
+
+  connect();
+})();
+</script>
+</body>
+</html>

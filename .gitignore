@@ -1,0 +1,77 @@
+# ============ 构建产物 ============
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.dll
+*.pdb
+*.xml
+*.cache
+*.resx.lock
+UpgradeLog.htm
+*.vue
+
+# 例外：这些 DLL 是源码的一部分（如果有）
+!packages/**/*.dll
+
+# ============ NuGet ============
+packages/
+*.nupkg
+!packages/repositories.config
+
+# ============ Visual Studio ============
+.vs/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+
+# ============ ReSharper / Rider ============
+_ReSharper*/
+*.DotSettings.user
+.idea/
+
+# ============ 运行时数据（绝对不能提交）============
+# 用户配置、数据库、日志里有角色名/区服/挖宝记录等隐私
+*.db
+*.db-shm
+*.db-wal
+events.db
+settings.json
+defaults.json
+data_version.json
+segment_snapshots.json
+install.json
+*.log
+log/
+data/
+backup/
+
+# ============ 临时/测试产物 ============
+_tmp/
+temp/
+*.tmp
+*.bak
+*.old
+renders/
+*.png
+!docs/images/*.png
+
+# ============ 操作系统 ============
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ============ 发布时的临时文件 ============
+*.zip
+publish/
+
+# ============ 旧版残留 ============
+# 项目目录下有一份 2026-10-11 的旧 overlay.html，未被 csproj 引用，
+# 实际使用的是 web/overlay.html。如需保留历史可自行提交。
+FF14TreasureHunterACT/overlay.html
+
+# ============ 本地运维工具（不随仓库发布）============
+# IIS 访问统计页 + 本地测试脚本：依赖 IIS/PHP，与插件技术栈无关，
+# 且含本机部署路径，故不纳入公开仓库。
+_deploy/

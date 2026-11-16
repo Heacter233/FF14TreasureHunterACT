@@ -1,0 +1,104 @@
+name: Bug 报告
+description: 插件功能异常、报错、统计不对
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量填写完整，尤其是**运行日志**和**插件版本**，
+        这两项能极大加快定位速度。
+
+        > 提交前请确认已升级到最新版本，并搜索过已有 Issue。
+
+  - type: checkboxes
+    id: precheck
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已升级到最新版本，问题仍然存在
+          required: true
+        - label: 我已搜索过现有 Issue，没有重复
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么？你期望发生什么？
+      placeholder: |
+        例如：打完一张图后，「已挖地图数」没有增加。
+        期望：应该 +1。
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 启动 ACT 并启用插件
+        2. 进入挖宝地图
+        3. 打完一张图
+        4. 观察主面板「已挖地图数」
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      description: 主面板「插件版本」处显示，或 DLL 文件属性里的文件版本
+      placeholder: "1.0.4.4"
+    validations:
+      required: true
+
+  - type: input
+    id: act-version
+    attributes:
+      label: ACT 版本
+      description: ACT 主界面标题栏或「关于」里可以看到
+      placeholder: "3.8.5.288"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows 8.1
+        - Windows 7
+        - 其他（请在补充信息里说明）
+    validations:
+      required: true
+
+  - type: input
+    id: install-path
+    attributes:
+      label: 插件安装路径
+      description: 完整路径。如果装在 OneDrive / 我的文档等云同步目录，请特别说明
+      placeholder: "D:\\ACT.DieMoe\\Plugins"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 运行日志
+      description: |
+        插件主面板底部的「运行日志」内容。可直接复制粘贴。
+        涉及识别问题时，请把日志里 `[识别]` 开头的行一并贴上。
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图、其他插件、整合包名称、最近改动过什么配置等
+    validations:
+      required: false
