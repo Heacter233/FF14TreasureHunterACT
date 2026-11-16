@@ -53,7 +53,7 @@
 - Windows 通知
 
 ### 常见问题
-- [QA文档](docs/ACT 挖宝会计插件帮助QA.md)
+- [QA文档](docs/ACT挖宝会计插件帮助QA.md)
 ---
 
 ## 界面
