@@ -614,6 +614,84 @@
     return resp.json();
   }
 
+  // ---------- 金额单位换算（只在前端处理） ----------
+  // maps.json 的市价/加工资、工资/图钱、run_summary 的成本，在“金币用万显示”开启时
+  // 都是“万”为单位；历史页统一换算成金币再展示。system_gold 事件本身是金币，不能乘。
+  function moneyScale() {
+    return (state.meta && state.meta.money_unit_wan) ? 10000 : 1;
+  }
+  function scaleMoney(v, scale) {
+    return (Number(v) || 0) * scale;
+  }
+
+  function normalizeOverview(d) {
+    if (!d || d.__moneyScaled) return d;
+    d.__moneyScaled = true;
+    const scale = moneyScale();
+    d.money_scale = scale;
+    if (scale === 1) return d;
+
+    const t = d.totals || {};
+    t.loot_value = scaleMoney(t.loot_value, scale);
+    t.cost = scaleMoney(t.cost, scale);
+    // system_gold 已是金币；收入 = 换算后的出货价值 + 原始系统金
+    t.income = t.loot_value + (Number(t.gold) || 0);
+    t.profit = t.income - t.cost;
+    t.per_map_value = t.maps > 0 ? t.loot_value / t.maps : 0;
+    t.per_map_income = t.maps > 0 ? t.income / t.maps : 0;
+    t.per_run_profit = t.runs > 0 ? t.profit / t.runs : 0;
+
+    (d.daily || []).forEach(function (x) {
+      x.loot_value = scaleMoney(x.loot_value, scale);
+      x.cost = scaleMoney(x.cost, scale);
+      x.income = x.loot_value + (Number(x.gold) || 0);
+      x.profit = x.income - x.cost;
+    });
+    (d.runs || []).forEach(function (r) {
+      r.loot_value = scaleMoney(r.loot_value, scale);
+      r.cost = scaleMoney(r.cost, scale);
+      r.income = r.loot_value + (Number(r.gold) || 0);
+      r.profit = r.income - r.cost;
+    });
+    (d.items || []).forEach(function (it) {
+      it.value = scaleMoney(it.value, scale);
+      it.price = scaleMoney(it.price, scale);
+      it.bonus = scaleMoney(it.bonus, scale);
+    });
+    (d.map_types || []).forEach(function (m) {
+      m.value = scaleMoney(m.value, scale);
+    });
+    return d;
+  }
+
+  function normalizePivot(d) {
+    if (!d || d.__moneyScaled) return d;
+    d.__moneyScaled = true;
+    const scale = moneyScale();
+    d.money_scale = scale;
+    if (scale === 1 || d.measure !== 'value') return d;
+    (d.cells || []).forEach(function (c) { c.v = scaleMoney(c.v, scale); });
+    d.row_totals = (d.row_totals || []).map(function (v) { return scaleMoney(v, scale); });
+    d.col_totals = (d.col_totals || []).map(function (v) { return scaleMoney(v, scale); });
+    d.grand = scaleMoney(d.grand, scale);
+    return d;
+  }
+
+  function normalizeDetail(d) {
+    if (!d || d.__moneyScaled) return d;
+    d.__moneyScaled = true;
+    const scale = moneyScale();
+    d.money_scale = scale;
+    if (scale === 1) return d;
+    (d.rows || []).forEach(function (r) {
+      if (r.type === 'loot') {
+        r.price = scaleMoney(r.price, scale);
+        r.value = scaleMoney(r.value, scale);
+      }
+    });
+    return d;
+  }
+
   function setStatus(text, isErr) {
     const el = $('#status');
     el.textContent = text || '';
@@ -743,9 +821,9 @@
     setStatus('加载中…');
     $('#overviewBanner').innerHTML = '';
     try {
-      const d = await apiGet('/api/history/overview', {
+      const d = normalizeOverview(await apiGet('/api/history/overview', {
         from: state.from, to: state.to, runs: runsParam()
-      });
+      }));
       if (seq !== state.seq) return;
       state.overview = d;
       renderOverview();
@@ -775,8 +853,8 @@
       kpi('已挖地图', fmtInt(t.maps), '魔纹率 ' + fmtPct(t.seal_rate)),
       kpi('出现魔纹', fmtInt(t.magic_seals), '宝物库 ' + fmtInt(t.vaults) + ' 次'),
       kpi('出货件数', fmtInt(t.loot_qty), '每图 ' + fmtNum(t.per_map_loot)),
-      kpi('出货价值', fmtNum(t.loot_value), '按当前配置价', 'blue'),
-      kpi('系统金', fmtNum(t.gold), '', 'blue'),
+      kpi('出货价值', fmtNum(t.loot_value), d.money_scale > 1 ? '按当前价 ×10000' : '按当前配置价', 'blue'),
+      kpi('系统金', fmtNum(t.gold), '原值（不换算）', 'blue'),
       kpi('总收入', fmtNum(t.income), '出货 + 系统金', 'good'),
       kpi('总成本', fmtNum(t.cost), '按图分摊到日', ''),
       kpi('盈亏', fmtNum(t.profit), '日成本为估算值', t.profit >= 0 ? 'good' : 'bad'),
@@ -829,8 +907,13 @@
     Object.keys(notes).forEach(function (k) {
       items.push('<b>' + escapeHtml(labels[k] || k) + '：</b>' + escapeHtml(notes[k]));
     });
+    const scale = (state.overview && state.overview.money_scale) || 1;
+    const moneyNote = scale > 1
+      ? '检测到插件启用“金币用万显示”：市价、工资/图钱、成本已 ×10000 换算为金币；收入 = 换算后出货价值 + 系统金（原值）。'
+      : '按原始数值展示，未做万单位换算。';
     $('#notes').innerHTML = items.join('<br>') +
-      '<br><b>金额：</b>按原始数值展示，未做万单位换算。';
+      '<br><b>金额：</b>' + escapeHtml(moneyNote) +
+      '<br><b>系统金：</b>事件本身记录的是金币，不做万换算。';
   }
 
   function renderBars(sel, items, opts) {
@@ -1048,10 +1131,10 @@
     const seq = ++state.seq;
     setStatus('透视加载中…');
     try {
-      const d = await apiGet('/api/history/pivot', {
+      const d = normalizePivot(await apiGet('/api/history/pivot', {
         from: state.from, to: state.to, runs: runsParam(),
         row: state.pivotRow, col: state.pivotCol, measure: state.pivotMeasure
-      });
+      }));
       if (seq !== state.seq) return;
       state.pivotData = d;
       renderPivot();
@@ -1109,7 +1192,9 @@
     html += '<td class="total">' + measureFmt(d.measure, d.grand) + '</td></tr></tfoot></table>';
     host.innerHTML = html;
 
-    $('#pivotHint').textContent = '提示：点击任意数值单元格可下钻查看明细；' +
+    const scaleHint = (d.measure === 'value' && d.money_scale > 1)
+      ? '物品价值已按“万”单位 ×10000 换算；' : '';
+    $('#pivotHint').textContent = scaleHint + '提示：点击任意数值单元格可下钻查看明细；' +
       (d.truncated ? '结果超过 500 行/列，已截断。' : '') +
       ' 地图类型中「混合」「未标注」表示该车次无法唯一归类。';
 
@@ -1170,7 +1255,7 @@
     state.detail.page = page || 1;
     setStatus('明细加载中…');
     try {
-      const d = await apiGet('/api/history/detail', detailParams(state.detail.page));
+      const d = normalizeDetail(await apiGet('/api/history/detail', detailParams(state.detail.page)));
       if (seq !== state.seq) return;
       state.detail.total = d.total;
       state.detail.rows = d.rows;
@@ -1231,9 +1316,9 @@
   async function detailCsv() {
     try {
       setStatus('准备导出…');
-      const d = await apiGet('/api/history/detail', detailParams(1));
+      const d = normalizeDetail(await apiGet('/api/history/detail', detailParams(1)));
       const size = Math.min(d.total, 5000);
-      const all = await apiGet('/api/history/detail', Object.assign(detailParams(1), { size: size }));
+      const all = normalizeDetail(await apiGet('/api/history/detail', Object.assign(detailParams(1), { size: size })));
       const rows = [['时间', '车次', '类型', '名称', '数量', '单价', '价值', '系统金', '宝物库', '区域']];
       (all.rows || []).forEach(function (r) {
         rows.push([r.ts, r.run, TYPE_LABEL[r.type] || r.type, r.name, r.qty, r.price, r.value, r.gold, r.vault, r.zone]);
@@ -1259,8 +1344,8 @@
         })
       ]);
       if (seq !== state.seq) return;
-      state.day.overview = results[0];
-      state.day.rows = results[1].rows;
+      state.day.overview = normalizeOverview(results[0]);
+      state.day.rows = normalizeDetail(results[1]).rows;
       renderDay();
       setStatus(date + ' · ' + fmtInt(results[0].totals.events) + ' 条事件');
     } catch (e) {
@@ -1388,7 +1473,7 @@
     params.page = 1;
     params.size = 200;
     try {
-      const res = await apiGet('/api/history/detail', params);
+      const res = normalizeDetail(await apiGet('/api/history/detail', params));
       $('#modalNote').textContent = '共 ' + fmtInt(res.total) + ' 条，显示前 ' + fmtInt(res.rows.length) + ' 条';
       if (!res.rows.length) {
         $('#modalTable').innerHTML = '<div class="empty">没有匹配的明细</div>';
