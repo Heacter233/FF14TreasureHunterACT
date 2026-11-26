@@ -6,6 +6,49 @@ using System.IO;
 
 namespace FF14TreasureHunterACT
 {
+    /// <summary>历史页聚合事实：按 日期/小时/车次/物品/层级/宝物库 预聚合后的一行。</summary>
+    public class HistoryFact
+    {
+        public string Date = "";
+        public string Hour = "";
+        public string RunLabel = "";
+        public string Type = "";
+        public string ItemName = "";
+        public string LayerName = "";
+        public string CustomName = "";
+        public string VaultMap = "";
+        public string Zone = "";
+        public double Quantity;
+        public int Records;
+    }
+
+    /// <summary>历史页“车次”汇总行（收入/成本按插件记录，活动量按事件）。</summary>
+    public class HistoryRunRow
+    {
+        public string Label = "";
+        public string FirstTs = "";
+        public string LastTs = "";
+        public int Maps;
+        public int Seals;
+        public double Gold;
+        public int Events;
+        public double Cost;
+        public double ExtraCost;
+        public double Elapsed;
+        public bool HasSummary;
+    }
+
+    /// <summary>宝物库停留记录（用事件跨度估算时长，vault_segments.end_time 目前不落库）。</summary>
+    public class HistoryVaultRow
+    {
+        public long Id;
+        public string StartTime = "";
+        public string MapName = "";
+        public string LastTs = "";
+        public int LootQty;
+        public int LayerCount;
+    }
+
     public class Database
     {
         private readonly string _dbPath;
@@ -116,6 +159,15 @@ namespace FF14TreasureHunterACT
                     snapshot TEXT,
                     created_at TEXT
                 );
+
+                -- 历史页按日期/车次/关联表查询，给老库补索引（幂等）
+                CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);
+                CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(event_type, timestamp);
+                CREATE INDEX IF NOT EXISTS idx_events_run_ts ON events(run_label, timestamp);
+                CREATE INDEX IF NOT EXISTS idx_loot_event ON loot_items(event_id);
+                CREATE INDEX IF NOT EXISTS idx_loot_vault ON loot_items(vault_segment_id);
+                CREATE INDEX IF NOT EXISTS idx_layer_event ON layer_entries(event_id);
+                CREATE INDEX IF NOT EXISTS idx_custom_event ON custom_records(event_id);
 
                 INSERT OR IGNORE INTO player_state (id) VALUES (1);
             ";
@@ -782,6 +834,423 @@ namespace FF14TreasureHunterACT
                                 reader.IsDBNull(4) ? "" : reader.GetString(4)
                             ));
                         }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // ============================================================
+        // 历史分析（网页面板）
+        // ============================================================
+
+        /// <summary>给历史查询拼 run_label IN (...) 条件，并注册参数。</summary>
+        private static string BuildRunFilter(List<string> runLabels, SQLiteCommand cmd, string alias = "e")
+        {
+            if (runLabels == null || runLabels.Count == 0) return "";
+            var names = new List<string>();
+            for (int i = 0; i < runLabels.Count; i++)
+            {
+                string p = "@rl" + i;
+                names.Add(p);
+                cmd.Parameters.AddWithValue(p, runLabels[i]);
+            }
+            return " AND " + alias + ".run_label IN (" + string.Join(",", names) + ")";
+        }
+
+        /// <summary>
+        /// 历史页用的聚合事实：只按 (日期, 小时, 车次, 物品/层级/自定义名, 宝物库, 区域) 聚合，
+        /// 由上层再按任意维度透视，避免为每种行列组合写一套 SQL。
+        /// </summary>
+        public List<HistoryFact> GetHistoryFacts(string from, string to, List<string> runLabels)
+        {
+            var list = new List<HistoryFact>();
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    string rf = BuildRunFilter(runLabels, cmd);
+                    cmd.CommandText = @"
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'loot', l.item_name, '', '',
+       COALESCE(v.map_name,''), COALESCE(l.map_name,''),
+       CAST(SUM(l.quantity) AS REAL), COUNT(*)
+FROM loot_items l
+JOIN events e ON l.event_id = e.id
+LEFT JOIN vault_segments v ON l.vault_segment_id = v.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3,5,8,9
+UNION ALL
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'layer', '', le.layer_name, '',
+       COALESCE(v.map_name,''), COALESCE(e.extra,''),
+       CAST(COUNT(*) AS REAL), COUNT(*)
+FROM layer_entries le
+JOIN events e ON le.event_id = e.id
+LEFT JOIN vault_segments v ON le.vault_segment_id = v.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3,6,8,9
+UNION ALL
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'map_complete', '', '', '', '', '',
+       CAST(COUNT(*) AS REAL), COUNT(*)
+FROM events e
+WHERE e.event_type='map_complete' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3
+UNION ALL
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'magic_seal', '', '', '', '', '',
+       CAST(COUNT(*) AS REAL), COUNT(*)
+FROM events e
+WHERE e.event_type='magic_seal' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3
+UNION ALL
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'system_gold', '', '', '', '', '',
+       CAST(COALESCE(SUM(CAST(e.extra AS REAL)),0) AS REAL), COUNT(*)
+FROM events e
+WHERE e.event_type='system_gold' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3
+UNION ALL
+SELECT substr(e.timestamp,1,10), substr(e.timestamp,12,2), e.run_label,
+       'custom', '', '', c.record_name, '', '',
+       CAST(COALESCE(SUM(c.value),0) AS REAL), COUNT(*)
+FROM custom_records c
+JOIN events e ON c.event_id = e.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + @"
+GROUP BY 1,2,3,7
+";
+                    cmd.Parameters.AddWithValue("@from", from);
+                    cmd.Parameters.AddWithValue("@to", to);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new HistoryFact
+                            {
+                                Date = reader.GetString(0),
+                                Hour = reader.GetString(1),
+                                RunLabel = reader.GetString(2),
+                                Type = reader.GetString(3),
+                                ItemName = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                                LayerName = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                                CustomName = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                                VaultMap = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                                Zone = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                                Quantity = Convert.ToDouble(reader.GetValue(9)),
+                                Records = Convert.ToInt32(reader.GetValue(10))
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        /// <summary>历史明细（带筛选与分页），供透视下钻/CSV 导出。</summary>
+        public List<(string Ts, string RunLabel, string Type, string Name,
+                     double Qty, double Gold, string Vault, string Zone)>
+            GetHistoryDetail(string from, string to, List<string> runLabels, string type,
+                             List<string> items, string layer, string vault, string hour,
+                             string weekday, string zone, string custom, string keyword,
+                             int page, int size, out int total)
+        {
+            total = 0;
+            var list = new List<(string, string, string, string, double, double, string, string)>();
+            if (page < 1) page = 1;
+            if (size < 1) size = 100;
+            if (size > 5000) size = 5000;
+
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    string rf = BuildRunFilter(runLabels, cmd);
+                    string extraCond = "";
+                    if (!string.IsNullOrEmpty(hour))
+                    {
+                        extraCond += " AND substr(e.timestamp,12,2)=@hour";
+                        cmd.Parameters.AddWithValue("@hour", hour);
+                    }
+                    if (!string.IsNullOrEmpty(weekday))
+                    {
+                        extraCond += " AND CAST(strftime('%w', e.timestamp) AS INTEGER)=@weekday";
+                        cmd.Parameters.AddWithValue("@weekday", weekday);
+                    }
+                    if (!string.IsNullOrEmpty(vault))
+                        cmd.Parameters.AddWithValue("@vault", vault);
+                    if (!string.IsNullOrEmpty(zone))
+                        cmd.Parameters.AddWithValue("@zone", zone);
+                    if (!string.IsNullOrEmpty(keyword))
+                        cmd.Parameters.AddWithValue("@kw", "%" + keyword + "%");
+                    if (!string.IsNullOrEmpty(layer))
+                        cmd.Parameters.AddWithValue("@layer", layer);
+                    if (!string.IsNullOrEmpty(custom))
+                        cmd.Parameters.AddWithValue("@custom", custom);
+
+                    string itemCond = "";
+                    bool hasItems = items != null && items.Count > 0;
+                    if (hasItems)
+                    {
+                        var ps = new List<string>();
+                        for (int i = 0; i < items.Count; i++)
+                        {
+                            string p = "@it" + i;
+                            ps.Add(p);
+                            cmd.Parameters.AddWithValue(p, items[i]);
+                        }
+                        itemCond = " AND l.item_name IN (" + string.Join(",", ps) + ")";
+                    }
+
+                    bool wantAll = string.IsNullOrEmpty(type)
+                                   && !hasItems && string.IsNullOrEmpty(layer) && string.IsNullOrEmpty(custom)
+                                   && string.IsNullOrEmpty(vault) && string.IsNullOrEmpty(zone);
+                    bool want(string t)
+                    {
+                        if (wantAll) return true;
+                        if (!string.IsNullOrEmpty(type) && type != t) return false;
+                        if (hasItems && t != "loot") return false;
+                        if (!string.IsNullOrEmpty(layer) && t != "layer") return false;
+                        if (!string.IsNullOrEmpty(custom) && t != "custom") return false;
+                        if (!string.IsNullOrEmpty(vault) &&
+                            t != "loot" && t != "layer" && t != "custom") return false;
+                        if (!string.IsNullOrEmpty(zone) && t != "loot" && t != "layer") return false;
+                        return true;
+                    }
+
+                    string kwLoot = string.IsNullOrEmpty(keyword) ? "" : " AND l.item_name LIKE @kw";
+                    string kwLayer = string.IsNullOrEmpty(keyword) ? "" : " AND le.layer_name LIKE @kw";
+                    string kwCustom = string.IsNullOrEmpty(keyword) ? "" : " AND c.record_name LIKE @kw";
+                    string vCond = string.IsNullOrEmpty(vault) ? "" : " AND COALESCE(v.map_name,'')=@vault";
+                    string zLoot = string.IsNullOrEmpty(zone) ? "" : " AND COALESCE(l.map_name,'')=@zone";
+                    string zLayer = string.IsNullOrEmpty(zone) ? "" : " AND COALESCE(e.extra,'')=@zone";
+
+                    var parts = new List<string>();
+                    if (want("loot"))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'loot', l.item_name, CAST(l.quantity AS REAL), 0.0,
+       COALESCE(v.map_name,''), COALESCE(l.map_name,'')
+FROM loot_items l
+JOIN events e ON l.event_id = e.id
+LEFT JOIN vault_segments v ON l.vault_segment_id = v.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond + itemCond + vCond + zLoot + kwLoot);
+                    if (want("layer"))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'layer', le.layer_name, 1.0, 0.0,
+       COALESCE(v.map_name,''), COALESCE(e.extra,'')
+FROM layer_entries le
+JOIN events e ON le.event_id = e.id
+LEFT JOIN vault_segments v ON le.vault_segment_id = v.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond + 
+                            (string.IsNullOrEmpty(layer) ? "" : " AND le.layer_name=@layer") +
+                            vCond + zLayer + kwLayer);
+                    if (want("map_complete") && !hasItems && string.IsNullOrEmpty(layer) && string.IsNullOrEmpty(custom))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'map_complete', '', 1.0, 0.0, '', ''
+FROM events e
+WHERE e.event_type='map_complete' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond);
+                    if (want("magic_seal") && !hasItems && string.IsNullOrEmpty(layer) && string.IsNullOrEmpty(custom))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'magic_seal', '', 1.0, 0.0, '', ''
+FROM events e
+WHERE e.event_type='magic_seal' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond);
+                    if (want("system_gold") && !hasItems && string.IsNullOrEmpty(layer) && string.IsNullOrEmpty(custom))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'system_gold', '', 0.0,
+       CAST(COALESCE(CAST(e.extra AS REAL),0) AS REAL), '', ''
+FROM events e
+WHERE e.event_type='system_gold' AND substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond);
+                    if (want("custom"))
+                        parts.Add(@"
+SELECT e.timestamp, e.run_label, 'custom', c.record_name, CAST(c.value AS REAL), 0.0,
+       COALESCE(v.map_name,''), ''
+FROM custom_records c
+JOIN events e ON c.event_id = e.id
+LEFT JOIN vault_segments v ON c.vault_segment_id = v.id
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to" + rf + extraCond +
+                            (string.IsNullOrEmpty(custom) ? "" : " AND c.record_name=@custom") +
+                            vCond + kwCustom);
+
+                    cmd.Parameters.AddWithValue("@from", from);
+                    cmd.Parameters.AddWithValue("@to", to);
+
+                    if (parts.Count == 0) return list;
+                    string unionSql = string.Join(" UNION ALL ", parts);
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM (" + unionSql + ")";
+                    total = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT * FROM (" + unionSql + @") ORDER BY 1 DESC LIMIT @lim OFFSET @off";
+                    cmd.Parameters.AddWithValue("@lim", size);
+                    cmd.Parameters.AddWithValue("@off", (page - 1) * size);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add((
+                                reader.GetString(0),
+                                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                                reader.GetString(2),
+                                reader.IsDBNull(3) ? "" : reader.GetString(3),
+                                Convert.ToDouble(reader.GetValue(4)),
+                                Convert.ToDouble(reader.GetValue(5)),
+                                reader.IsDBNull(6) ? "" : reader.GetString(6),
+                                reader.IsDBNull(7) ? "" : reader.GetString(7)
+                            ));
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        /// <summary>按车次汇总活动量与财务记录（收入口径由上层重算，这里只取原始成本）。</summary>
+        public List<HistoryRunRow> GetHistoryRuns(string from, string to)
+        {
+            var list = new List<HistoryRunRow>();
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT e.run_label, MIN(e.timestamp), MAX(e.timestamp),
+       SUM(CASE WHEN e.event_type='map_complete' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN e.event_type='magic_seal' THEN 1 ELSE 0 END),
+       CAST(COALESCE(SUM(CASE WHEN e.event_type='system_gold'
+                              THEN CAST(e.extra AS REAL) ELSE 0 END),0) AS REAL),
+       COUNT(*)
+FROM events e
+WHERE substr(e.timestamp,1,10) BETWEEN @from AND @to
+GROUP BY e.run_label
+ORDER BY MIN(e.timestamp) DESC";
+                    cmd.Parameters.AddWithValue("@from", from);
+                    cmd.Parameters.AddWithValue("@to", to);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var row = new HistoryRunRow
+                            {
+                                Label = reader.GetString(0),
+                                FirstTs = reader.GetString(1),
+                                LastTs = reader.GetString(2),
+                                Maps = Convert.ToInt32(reader.GetValue(3)),
+                                Seals = Convert.ToInt32(reader.GetValue(4)),
+                                Gold = Convert.ToDouble(reader.GetValue(5)),
+                                Events = Convert.ToInt32(reader.GetValue(6))
+                            };
+                            list.Add(row);
+                        }
+                    }
+                }
+
+                // 财务记录：优先 run_summary；没有时退回 cost_snapshots 累加
+                foreach (var row in list)
+                {
+                    var summary = GetRunSummary(row.Label);
+                    if (summary.HasValue)
+                    {
+                        row.HasSummary = true;
+                        row.Cost = summary.Value.TotalCost;
+                        row.ExtraCost = summary.Value.ExtraCost;
+                        row.Elapsed = summary.Value.Elapsed;
+                    }
+                    else
+                    {
+                        using (var cmd = _conn.CreateCommand())
+                        {
+                            cmd.CommandText = "SELECT COALESCE(SUM(total_cost),0), COALESCE(SUM(profit),0) FROM cost_snapshots WHERE run_label=@rl";
+                            cmd.Parameters.AddWithValue("@rl", row.Label);
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    row.Cost = Convert.ToDouble(reader.GetValue(0));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        /// <summary>宝物库停留记录：时长用“进入时间 → 该次最后一条掉落/层级事件”估算。</summary>
+        public List<HistoryVaultRow> GetHistoryVaults(string from, string to)
+        {
+            var list = new List<HistoryVaultRow>();
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT v.id, COALESCE(v.start_time,''), COALESCE(v.map_name,''),
+       COALESCE(
+         (SELECT MAX(e.timestamp) FROM loot_items l JOIN events e ON l.event_id=e.id
+           WHERE l.vault_segment_id=v.id),
+         (SELECT MAX(e2.timestamp) FROM layer_entries le JOIN events e2 ON le.event_id=e2.id
+           WHERE le.vault_segment_id=v.id),
+         ''
+       ) AS last_ts,
+       COALESCE((SELECT SUM(l.quantity) FROM loot_items l WHERE l.vault_segment_id=v.id),0),
+       COALESCE((SELECT COUNT(*) FROM layer_entries le WHERE le.vault_segment_id=v.id),0)
+FROM vault_segments v
+WHERE substr(COALESCE(v.start_time,''),1,10) BETWEEN @from AND @to
+ORDER BY v.start_time ASC";
+                    cmd.Parameters.AddWithValue("@from", from);
+                    cmd.Parameters.AddWithValue("@to", to);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new HistoryVaultRow
+                            {
+                                Id = Convert.ToInt64(reader.GetValue(0)),
+                                StartTime = reader.GetString(1),
+                                MapName = reader.GetString(2),
+                                LastTs = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                                LootQty = Convert.ToInt32(reader.GetValue(4)),
+                                LayerCount = Convert.ToInt32(reader.GetValue(5))
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        public List<string> GetDistinctLootItems()
+        {
+            var list = new List<string>();
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT DISTINCT item_name FROM loot_items WHERE item_name IS NOT NULL ORDER BY item_name";
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read()) list.Add(reader.GetString(0));
+                    }
+                }
+            }
+            return list;
+        }
+
+        public List<string> GetDistinctLayerNames()
+        {
+            var list = new List<string>();
+            lock (_lock)
+            {
+                using (var cmd = _conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT DISTINCT layer_name FROM layer_entries WHERE layer_name IS NOT NULL ORDER BY layer_name";
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read()) list.Add(reader.GetString(0));
                     }
                 }
             }

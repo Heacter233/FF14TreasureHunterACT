@@ -1,527 +1,1677 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>挖宝会计 - 历史记录</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>挖宝会计 · 历史分析</title>
 <style>
+  :root {
+    --bg: #17171c;
+    --panel: #212127;
+    --panel-2: #26262e;
+    --line: #31313a;
+    --line-soft: #2a2a32;
+    --text: #d7d7df;
+    --muted: #8a8a98;
+    --gold: #f0d080;
+    --gold-dim: #b89a58;
+    --green: #8fd18f;
+    --red: #e58b8b;
+    --blue: #8fc7e8;
+    --purple: #c9a8e8;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    background: #1e1e1e;
-    color: #d0d0d0;
-    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
     font-size: 13px;
     overflow: hidden;
   }
-  .layout {
-    display: flex;
-    height: 100vh;
-  }
+  button, input, select { font-family: inherit; font-size: 13px; }
+  button { cursor: pointer; }
+  a { color: var(--blue); }
 
-  /* ---- 左侧 ---- */
-  .sidebar {
-    width: 180px;
-    background: #252525;
-    border-right: 1px solid #333;
+  /* ---------- 布局 ---------- */
+  .app { display: flex; height: 100vh; }
+  .rail {
+    width: 196px;
+    flex-shrink: 0;
+    background: #1d1d23;
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
   }
-  .sidebar-header {
-    padding: 8px;
-    border-bottom: 1px solid #333;
+  .brand { padding: 14px 14px 10px; border-bottom: 1px solid var(--line-soft); }
+  .brand b { display: block; color: var(--gold); font-size: 15px; letter-spacing: .5px; }
+  .brand span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .nav { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .nav button {
+    text-align: left;
+    background: transparent;
+    border: 0;
+    color: #b9b9c4;
+    padding: 8px 10px;
+    border-radius: 5px;
   }
-  .sidebar-header select {
-    width: 100%;
-    background: #2a2a2a;
-    color: #f0d080;
-    border: 1px solid #3a3a3a;
-    padding: 4px 6px;
-    border-radius: 3px;
-    font-size: 13px;
-  }
-  .date-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 6px;
-  }
+  .nav button:hover { background: #27272f; color: var(--text); }
+  .nav button.active { background: #33332a; color: var(--gold); font-weight: bold; }
+  .rail-dates { flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }
+  .rail-title { padding: 9px 12px 6px; color: var(--muted); font-size: 11px; letter-spacing: .5px; }
+  .date-list { overflow-y: auto; padding: 0 8px 8px; }
   .date-item {
-    padding: 6px 8px;
-    border-radius: 3px;
-    cursor: pointer;
-    color: #c0c0c0;
-    margin-bottom: 2px;
-    font-size: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 8px; border-radius: 4px; color: #bcbcc7; cursor: pointer;
+    font-size: 12px; margin-bottom: 1px;
   }
-  .date-item:hover {
-    background: #2f2f2f;
-  }
-  .date-item.active {
-    background: #3d3d2a;
-    color: #f0d080;
-    font-weight: bold;
-  }
+  .date-item:hover { background: #27272f; }
+  .date-item.active { background: #33332a; color: var(--gold); }
+  .date-item .n { color: #6f6f7d; font-size: 11px; }
+  .rail-foot { border-top: 1px solid var(--line-soft); padding: 8px 12px; color: #6f6f7d; font-size: 11px; line-height: 1.5; }
 
-  /* ---- 右侧 ---- */
-  .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+    padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
   }
-  .tabs {
-    display: flex;
-    background: #252525;
-    border-bottom: 1px solid #333;
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  .seg button { background: #24242b; border: 0; color: #b5b5c0; padding: 5px 10px; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: #2d2d36; color: var(--text); }
+  .seg button.active { background: #3b3524; color: var(--gold); }
+  .range-custom { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+  input[type="date"], input[type="text"], select {
+    background: #1c1c22; color: var(--text); border: 1px solid var(--line);
+    border-radius: 4px; padding: 5px 7px; outline: none;
   }
-  .tab {
-    padding: 8px 18px;
-    cursor: pointer;
-    color: #a09070;
-    border-bottom: 2px solid transparent;
-    font-size: 13px;
+  input[type="date"] { color-scheme: dark; }
+  input:focus, select:focus { border-color: var(--gold-dim); }
+  .btn {
+    background: #2a2a33; color: #c9c9d3; border: 1px solid var(--line);
+    border-radius: 4px; padding: 5px 12px;
   }
-  .tab:hover { background: #2a2a2a; }
-  .tab.active {
-    color: #f0d080;
-    border-bottom-color: #c0a050;
-    background: #2a2a2a;
-  }
-  .content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-  }
-  .pane { display: none; }
-  .pane.active { display: block; }
+  .btn:hover { background: #33333d; color: var(--text); }
+  .btn.primary { background: #4a3f24; border-color: #6a5a33; color: var(--gold); }
+  .btn.primary:hover { background: #5a4c2b; }
+  .spacer { flex: 1; }
+  .status { color: var(--muted); font-size: 12px; }
+  .status.err { color: var(--red); }
 
-  /* ---- 通用样式 ---- */
-  h3 {
-    color: #c0a050;
-    font-size: 13px;
-    margin: 12px 0 6px 0;
-    font-weight: bold;
+  .run-filter { position: relative; }
+  .run-btn { min-width: 132px; text-align: left; }
+  .run-btn .caret { float: right; color: var(--muted); }
+  .popover {
+    position: absolute; z-index: 40; top: calc(100% + 6px); left: 0;
+    width: 320px; max-height: 360px; display: flex; flex-direction: column;
+    background: #202027; border: 1px solid #3a3a45; border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.45);
   }
-  h3:first-child { margin-top: 0; }
+  .popover.hidden { display: none; }
+  .pop-actions { display: flex; gap: 8px; padding: 8px; border-bottom: 1px solid var(--line-soft); }
+  .pop-actions button { background: transparent; border: 0; color: var(--blue); padding: 2px 4px; font-size: 12px; }
+  .run-options { overflow-y: auto; padding: 6px; }
+  .run-op { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; cursor: pointer; }
+  .run-op:hover { background: #2a2a32; }
+  .run-op input { accent-color: #b89a58; }
+  .run-op .lbl { flex: 1; color: #cfcfd9; }
+  .run-op .meta { color: #777785; font-size: 11px; }
+
+  .content { flex: 1; overflow-y: auto; padding: 14px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- 卡片 / KPI ---------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 7px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .card-head h2, .card h2 {
+    font-size: 13px; color: var(--gold-dim); font-weight: bold;
+    margin: 0 0 8px 0; letter-spacing: .3px;
+  }
+  .card-head h2 { margin: 0; }
+  .card-head .seg { margin-left: auto; }
+  .sub-title { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 8px; margin-bottom: 12px;
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 9px 11px;
+  }
+  .kpi .l { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi .v { color: var(--gold); font-size: 18px; font-weight: bold; margin-top: 3px; line-height: 1.2; }
+  .kpi .s { color: #6f6f7d; font-size: 11px; margin-top: 2px; }
+  .kpi .v.good { color: var(--green); }
+  .kpi .v.bad { color: var(--red); }
+  .kpi .v.blue { color: var(--blue); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ---------- 图表 ---------- */
+  .chart { position: relative; width: 100%; height: 250px; }
+  .chart svg { display: block; width: 100%; height: 100%; }
+  .chart .grid { stroke: #2e2e37; stroke-width: 1; }
+  .chart .axis { fill: #747482; font-size: 10px; font-family: Consolas, monospace; }
+  .chart .line { fill: none; stroke-width: 2; }
+  .chart .area { opacity: .14; }
+  .chart .dot { stroke: #17171c; stroke-width: 1.5; }
+  .chart .hover-layer { fill: transparent; }
+  .chart .bar { opacity: .85; }
+  .chart .bar:hover { opacity: 1; }
+  .chart-tip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: #121216; border: 1px solid #454552; border-radius: 4px;
+    padding: 5px 8px; color: #e6e6ee; font-size: 11px; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .chart-tip.hidden { display: none; }
   .empty {
-    color: #666;
-    font-style: italic;
-    padding: 20px;
-    text-align: center;
+    color: #616170; font-style: italic; text-align: center; padding: 28px 10px;
   }
 
-  /* ---- 物品列表 ---- */
-  .map-group {
-    color: #a0d0a0;
-    font-weight: bold;
-    margin: 10px 0 4px 0;
-    padding-bottom: 2px;
-    border-bottom: 1px dashed #3a3a3a;
-  }
-  .item-row {
-    padding: 2px 0 2px 12px;
-    color: #d0d0d0;
-  }
-  .item-row .qty { color: #f0d080; }
+  /* ---------- 排行条 ---------- */
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; }
+  .bar-label { width: 112px; flex-shrink: 0; color: #cfcfd9; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; height: 9px; background: #1b1b21; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #6d5a2e, #c9a85c); }
+  .bar-fill.green { background: linear-gradient(90deg, #40623f, #8fd18f); }
+  .bar-fill.blue { background: linear-gradient(90deg, #35566a, #8fc7e8); }
+  .bar-val { width: 96px; flex-shrink: 0; text-align: right; color: var(--gold); font-family: Consolas, monospace; font-size: 12px; }
+  .bar-sub { width: 110px; flex-shrink: 0; color: #757583; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bars .empty { padding: 18px; }
 
-  /* ---- 时间线 ---- */
-  .timeline-row {
-    padding: 3px 0;
-    border-bottom: 1px solid #2a2a2a;
-    display: flex;
-    gap: 8px;
+  /* ---------- 表格 ---------- */
+  table.data {
+    width: 100%; border-collapse: collapse; font-size: 12px;
   }
-  .timeline-row .time {
-    color: #808080;
-    font-family: Consolas, monospace;
-    font-size: 12px;
-    min-width: 70px;
+  table.data th, table.data td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+  table.data thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #26262e; color: #a6a6b4; font-weight: normal;
+    text-align: left; white-space: nowrap;
   }
-  .timeline-row .icon { min-width: 18px; }
-  .timeline-row .text { flex: 1; }
-  .timeline-row.loot .text { color: #a0d0a0; }
-  .timeline-row.layer .text { color: #d0a0d0; }
-  .timeline-row.map_complete .text { color: #80c0e0; }
-  .timeline-row.magic_seal .text { color: #f0d080; font-weight: bold; }
-  .timeline-row.custom .text { color: #d0c0a0; }
-  .vault-tag {
-    color: #a0c0f0;
-    font-size: 11px;
-    margin-left: 6px;
-  }
+  table.data tbody tr:hover { background: #26262e; }
+  table.data td.num, table.data th.num { text-align: right; font-family: Consolas, monospace; }
+  table.data td.mono { font-family: Consolas, monospace; color: #a9a9b6; }
+  table.data td.name { color: #d7d7df; }
+  table.data .good { color: var(--green); }
+  table.data .bad { color: var(--red); }
+  .table-wrap { overflow: auto; max-height: 62vh; border: 1px solid var(--line-soft); border-radius: 5px; }
+  .table-wrap.short { max-height: 320px; }
 
-  /* ---- 汇总卡片 ---- */
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 8px;
-    margin-bottom: 12px;
+  /* ---------- 透视表 ---------- */
+  .pivot-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .pivot-controls label { color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+  .pivot-controls .spacer { flex: 1; }
+  .pivot-wrap { overflow: auto; max-height: 66vh; border: 1px solid var(--line-soft); border-radius: 5px; }
+  table.pivot { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 100%; }
+  table.pivot th, table.pivot td { padding: 6px 9px; border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft); white-space: nowrap; }
+  table.pivot thead th {
+    position: sticky; top: 0; z-index: 3; background: #26262e; color: #a6a6b4;
+    font-weight: normal; text-align: right;
   }
-  .stat-card {
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-radius: 4px;
-    padding: 8px 12px;
+  table.pivot thead th.corner { left: 0; z-index: 5; text-align: left; color: var(--muted); }
+  table.pivot tbody th {
+    position: sticky; left: 0; z-index: 2; background: #212127;
+    text-align: left; color: #d0d0da; font-weight: normal; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
   }
-  .stat-card .label {
-    color: #a09070;
-    font-size: 12px;
+  table.pivot tbody tr:hover td { background: #27272f; }
+  table.pivot td { text-align: right; font-family: Consolas, monospace; color: #c9c9d3; cursor: default; }
+  table.pivot td.cell { cursor: pointer; }
+  table.pivot td.cell:hover { background: #3a3322; color: var(--gold); }
+  table.pivot td.zero { color: #4d4d59; }
+  table.pivot th.total, table.pivot td.total { color: var(--gold); background: #252521; font-weight: bold; }
+  table.pivot tfoot th, table.pivot tfoot td {
+    position: sticky; bottom: 0; background: #25252c; color: var(--gold);
+    border-top: 1px solid #3a3a45; font-weight: bold;
   }
-  .stat-card .value {
-    color: #f0d080;
-    font-size: 16px;
-    font-weight: bold;
-    margin-top: 2px;
+  table.pivot tfoot th { left: 0; z-index: 4; text-align: left; }
+
+  /* ---------- 明细筛选 / 分页 ---------- */
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .filters label { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .filters select, .filters input { max-width: 160px; }
+  .pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 10px; color: var(--muted); }
+  .pager .btn { padding: 4px 10px; }
+  .pager .btn[disabled] { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- 时间线 ---------- */
+  .timeline { display: flex; flex-direction: column; }
+  .tl-row { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; }
+  .tl-time { width: 64px; flex-shrink: 0; color: #757583; font-family: Consolas, monospace; font-size: 11px; }
+  .tl-icon { width: 16px; flex-shrink: 0; text-align: center; }
+  .tl-text { flex: 1; color: #c9c9d3; }
+  .tl-text .qty { color: var(--gold); }
+  .tl-row.loot .tl-text { color: #b9dcb9; }
+  .tl-row.layer .tl-text { color: #d8b8dc; }
+  .tl-row.map_complete .tl-text { color: #9ccfe8; }
+  .tl-row.magic_seal .tl-text { color: var(--gold); }
+  .tl-row.custom .tl-text { color: #d8cba8; }
+  .vault-tag { color: var(--blue); font-size: 11px; margin-left: 6px; }
+
+  /* ---------- 提示 ---------- */
+  .notes { color: #767684; font-size: 11px; line-height: 1.7; margin: 4px 2px 18px; }
+  .notes b { color: #a5a5b2; font-weight: normal; }
+  .banner {
+    background: #242022; border: 1px solid #4a3336; color: #d6a3a3;
+    border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px;
   }
-  .stat-card .value.good { color: #90d090; }
-  .stat-card .value.bad  { color: #e08080; }
+  .banner.info { background: #1f2428; border-color: #33424a; color: #a8c3d2; }
+  .hidden { display: none !important; }
+
+  /* ---------- 弹窗 ---------- */
+  .modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+  .modal.hidden { display: none; }
+  .modal-box { width: min(1000px, 92vw); max-height: 86vh; display: flex; flex-direction: column; background: #1e1e24; border: 1px solid #3c3c47; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+  .modal-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .modal-head h3 { color: var(--gold); font-size: 13px; flex: 1; }
+  .modal-close { background: transparent; border: 0; color: var(--muted); font-size: 18px; line-height: 1; }
+  .modal-body { padding: 12px 14px; overflow: auto; }
+  .modal-note { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 980px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    body { overflow: auto; }
+    .app { flex-direction: column; height: auto; min-height: 100vh; }
+    .rail { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    .brand { display: none; }
+    .nav { flex-direction: row; overflow-x: auto; padding: 6px; }
+    .nav button { white-space: nowrap; }
+    .rail-dates { display: none; }
+    .rail-foot { display: none; }
+    .content { padding: 10px; }
+    .topbar { padding: 8px 10px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart { height: 210px; }
+    .bar-sub { display: none; }
+    .bar-label { width: 88px; }
+    .bar-val { width: 76px; }
+    .run-filter { width: 100%; }
+    .run-btn { width: 100%; }
+    .popover { width: 100%; }
+  }
 </style>
 </head>
 <body>
-<div class="layout">
 
-  <!-- 左侧：日期选择 -->
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <select id="monthSelect"></select>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><b>挖宝会计</b><span>历史分析 · 数据透视</span></div>
+    <nav class="nav" id="nav">
+      <button class="active" data-view="overview">概览</button>
+      <button data-view="pivot">透视表</button>
+      <button data-view="detail">明细</button>
+      <button data-view="day">单日回看</button>
+    </nav>
+    <div class="rail-dates">
+      <div class="rail-title">有数据的日子</div>
+      <div class="date-list" id="dateList"></div>
     </div>
-    <div class="date-list" id="dateList"></div>
-  </div>
+    <div class="rail-foot" id="railFoot"></div>
+  </aside>
 
-  <!-- 右侧：标签页 -->
-  <div class="main">
-    <div class="tabs">
-      <div class="tab active" data-tab="summary">汇总</div>
-      <div class="tab" data-tab="items">物品</div>
-      <div class="tab" data-tab="layers">层级/其他</div>
-      <div class="tab" data-tab="timeline">时间线</div>
-    </div>
+  <main class="main">
+    <header class="topbar">
+      <div class="seg" id="rangePresets">
+        <button data-range="7">近7天</button>
+        <button data-range="30" class="active">近30天</button>
+        <button data-range="90">近90天</button>
+        <button data-range="all">全部</button>
+      </div>
+      <div class="range-custom">
+        <input type="date" id="fromDate">
+        <span>—</span>
+        <input type="date" id="toDate">
+      </div>
+      <div class="run-filter">
+        <button class="btn run-btn" id="runBtn">全部车次 <span class="caret">▾</span></button>
+        <div class="popover hidden" id="runPopover">
+          <div class="pop-actions">
+            <button id="runAll">全选</button>
+            <button id="runNone">全不选</button>
+          </div>
+          <div class="run-options" id="runOptions"></div>
+        </div>
+      </div>
+      <button class="btn primary" id="refreshBtn">刷新</button>
+      <div class="spacer"></div>
+      <div class="status" id="status"></div>
+    </header>
+
     <div class="content">
-      <div class="pane active" id="pane-summary"></div>
-      <div class="pane" id="pane-items"></div>
-      <div class="pane" id="pane-layers"></div>
-      <div class="pane" id="pane-timeline"></div>
+      <!-- ========== 概览 ========== -->
+      <section class="view active" id="view-overview">
+        <div id="overviewBanner"></div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>趋势</h2>
+            <div class="seg" id="trendMetric">
+              <button data-metric="maps" class="active">地图</button>
+              <button data-metric="seals">魔纹</button>
+              <button data-metric="loot_qty">出货件数</button>
+              <button data-metric="loot_value">出货价值</button>
+              <button data-metric="gold">系统金</button>
+              <button data-metric="income">收入</button>
+              <button data-metric="profit">盈亏</button>
+            </div>
+          </div>
+          <div class="chart" id="trendChart"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>物品排行</h2>
+            <div class="bars" id="itemBars"></div>
+          </div>
+          <div class="card">
+            <h2>地图类型分布</h2>
+            <div class="bars" id="mapBars"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>时段 / 星期分布（事件数）</h2>
+          <div class="grid-2">
+            <div>
+              <div class="sub-title">小时</div>
+              <div class="chart" id="hourChart"></div>
+            </div>
+            <div>
+              <div class="sub-title">星期</div>
+              <div class="chart" id="weekdayChart"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>层级分布</h2>
+          <div class="bars" id="layerBars"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>车次汇总</h2>
+            <span class="status" id="runTableHint"></span>
+          </div>
+          <div class="table-wrap" id="runTable"></div>
+        </div>
+
+        <div class="notes" id="notes"></div>
+      </section>
+
+      <!-- ========== 透视表 ========== -->
+      <section class="view" id="view-pivot">
+        <div class="card">
+          <div class="pivot-controls">
+            <label>行 <select id="pivotRow"></select></label>
+            <label>列 <select id="pivotCol"></select></label>
+            <label>指标 <select id="pivotMeasure"></select></label>
+            <span class="spacer"></span>
+            <button class="btn" id="pivotExport">导出 CSV</button>
+          </div>
+          <div class="pivot-wrap" id="pivotTable"></div>
+          <div class="notes" id="pivotHint"></div>
+        </div>
+      </section>
+
+      <!-- ========== 明细 ========== -->
+      <section class="view" id="view-detail">
+        <div class="card">
+          <div class="filters">
+            <label>类型 <select id="fType"></select></label>
+            <label>物品 <select id="fItem"></select></label>
+            <label>层级 <select id="fLayer"></select></label>
+            <label>宝物库 <input type="text" id="fVault" placeholder="宝物库名"></label>
+            <label>区域 <input type="text" id="fZone" placeholder="区域名"></label>
+            <label>搜索 <input type="text" id="fKeyword" placeholder="名称包含"></label>
+            <button class="btn primary" id="fApply">筛选</button>
+            <button class="btn" id="fReset">重置</button>
+            <span class="spacer"></span>
+            <button class="btn" id="detailExport">导出 CSV</button>
+          </div>
+          <div class="table-wrap" id="detailTable"></div>
+          <div class="pager" id="detailPager"></div>
+        </div>
+      </section>
+
+      <!-- ========== 单日回看 ========== -->
+      <section class="view" id="view-day">
+        <div class="card">
+          <div class="card-head">
+            <h2>单日回看</h2>
+            <div class="range-custom">
+              <button class="btn" id="dayPrev">‹ 前一天</button>
+              <input type="date" id="dayDate">
+              <button class="btn" id="dayNext">后一天 ›</button>
+            </div>
+          </div>
+          <div class="kpi-grid" id="dayKpi"></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h2>物品</h2><div class="bars" id="dayItems"></div></div>
+          <div class="card"><h2>层级 / 其他记录</h2><div class="bars" id="dayLayers"></div></div>
+        </div>
+        <div class="card">
+          <h2>时间线</h2>
+          <div class="timeline" id="dayTimeline"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">下钻明细</h3>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-note" id="modalNote"></div>
+      <div class="table-wrap short" id="modalTable"></div>
     </div>
   </div>
-
 </div>
 
 <script>
-(function() {
-  // 自适应：http 下用相对路径；file:// 下用 127.0.0.1
-  const API_BASE = (location.protocol === 'http:' && location.host)
-                    ? ''
-                    : 'http://127.0.0.1:8765';
+(function () {
+  'use strict';
 
-  // token 附加参数
+  // ---------- 基础 ----------
+  const API_BASE = (location.protocol === 'http:' && location.host) ? '' : 'http://127.0.0.1:8765';
   const TOKEN = (typeof window.__LAN_TOKEN__ !== 'undefined') ? window.__LAN_TOKEN__ : '';
-  const TQ = TOKEN ? ('t=' + encodeURIComponent(TOKEN)) : '';
 
-  function apiUrl(path) {
-    if (!TQ) return API_BASE + path;
-    return API_BASE + path + (path.indexOf('?') >= 0 ? '&' : '?') + TQ;
+  const TYPE_LABEL = {
+    loot: '掉落', layer: '层级', map_complete: '地图完成',
+    magic_seal: '魔纹', system_gold: '系统金', custom: '其他记录'
+  };
+  const DIM_LABEL = {
+    date: '日期', week: '周', month: '月份', run: '车次', item: '物品',
+    map: '地图类型', layer: '层级', hour: '小时', weekday: '星期',
+    vault: '宝物库', zone: '区域', custom: '其他记录'
+  };
+  const MEASURE_LABEL = {
+    qty: '物品数量', value: '物品价值', events: '事件数', maps: '地图完成数',
+    seals: '魔纹数', layers: '层级次数', gold: '系统金', custom: '其他记录值',
+    loot_rows: '出货次数'
+  };
+  const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+  const state = {
+    meta: null,
+    from: '', to: '',
+    rangePreset: '30',
+    runs: new Set(),
+    view: 'overview',
+    trendMetric: 'maps',
+    pivotRow: 'item', pivotCol: 'date', pivotMeasure: 'qty',
+    pivotData: null,
+    overview: null,
+    detail: { page: 1, size: 100, total: 0, rows: [], filters: {} },
+    day: { date: '', overview: null, rows: [] },
+    seq: 0
+  };
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
+
+  function escapeHtml(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-
-  let allDates = [];
-  let currentMonth = '';
-  let currentDate = '';
-  let currentTab = 'summary';
-  let timelineData = [];
-
-  // ---------- 初始化 ----------
-  function init() {
-    bindTabs();
-    loadDates();
+  function fmtInt(v) {
+    if (v === null || v === undefined || isNaN(v)) return '0';
+    return Math.round(Number(v)).toLocaleString('zh-CN');
   }
-
-  function bindTabs() {
-    document.querySelectorAll('.tab').forEach(t => {
-      t.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-        document.querySelectorAll('.pane').forEach(x => x.classList.remove('active'));
-        t.classList.add('active');
-        currentTab = t.dataset.tab;
-        document.getElementById('pane-' + currentTab).classList.add('active');
-        renderCurrent();
-      });
-    });
+  function fmtNum(v) {
+    if (v === null || v === undefined || isNaN(v)) return '0';
+    const n = Number(v);
+    const s = n.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+    return s;
   }
-
-  function loadDates() {
-    fetch(apiUrl('/api/history/dates'))
-      .then(r => r.json())
-      .then(d => {
-        allDates = d.dates || [];
-        if (allDates.length === 0) {
-          document.getElementById('dateList').innerHTML =
-            '<div class="empty">暂无历史数据</div>';
-          return;
-        }
-        buildMonthSelect();
-        // 默认选中最新日期
-        selectDate(allDates[0]);
-      })
-      .catch(err => {
-        document.getElementById('dateList').innerHTML =
-          '<div class="empty">加载失败：' + err.message + '</div>';
-      });
+  function fmtCompact(v) {
+    const n = Number(v) || 0;
+    const a = Math.abs(n);
+    if (a >= 1e8) return (n / 1e8).toFixed(1) + '亿';
+    if (a >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    if (a >= 1000) return Math.round(n).toString();
+    return (Math.round(n * 10) / 10).toString();
   }
-
-  function buildMonthSelect() {
-    const months = [];
-    const seen = new Set();
-    allDates.forEach(d => {
-      const m = d.substring(0, 7);
-      if (!seen.has(m)) { seen.add(m); months.push(m); }
-    });
-    const sel = document.getElementById('monthSelect');
-    sel.innerHTML = months.map(m => {
-      const [y, mo] = m.split('-');
-      return '<option value="' + m + '">' + y + ' 年 ' + mo + ' 月</option>';
-    }).join('');
-    sel.onchange = () => {
-      currentMonth = sel.value;
-      renderDateList();
+  function fmtPct(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return '0%';
+    return n.toFixed(1) + '%';
+  }
+  function fmtDuration(sec) {
+    const n = Math.max(0, Math.round(Number(sec) || 0));
+    const h = Math.floor(n / 3600);
+    const m = Math.floor((n % 3600) / 60);
+    if (h > 0) return h + '小时' + (m ? m + '分' : '');
+    if (m > 0) return m + '分';
+    return n + '秒';
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function parseDay(s) {
+    if (!s) return null;
+    const p = s.split('-').map(Number);
+    if (p.length !== 3) return null;
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+  function dayStr(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  function addDays(s, n) {
+    const d = parseDay(s);
+    if (!d) return s;
+    d.setDate(d.getDate() + n);
+    return dayStr(d);
+  }
+  function lastDayOfMonth(ym) {
+    const p = ym.split('-').map(Number);
+    const d = new Date(p[0], p[1], 0);
+    return dayStr(d);
+  }
+  function weekdayIndex(label) { return WEEKDAYS.indexOf(label); }
+  function sqliteWeekday(label) {
+    const i = weekdayIndex(label);
+    return i < 0 ? '' : String((i + 1) % 7);
+  }
+  function debounce(fn, ms) {
+    let t = 0;
+    return function () {
+      const args = arguments, self = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(self, args); }, ms);
     };
-    currentMonth = months[0];
-    sel.value = currentMonth;
-    renderDateList();
+  }
+
+  function apiUrl(path, params) {
+    const qs = new URLSearchParams();
+    Object.keys(params || {}).forEach(function (k) {
+      const v = params[k];
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+    });
+    if (TOKEN) qs.set('t', TOKEN);
+    const q = qs.toString();
+    return API_BASE + path + (q ? '?' + q : '');
+  }
+  async function apiGet(path, params) {
+    const resp = await fetch(apiUrl(path, params), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  function setStatus(text, isErr) {
+    const el = $('#status');
+    el.textContent = text || '';
+    el.className = 'status' + (isErr ? ' err' : '');
+  }
+  function showError(err) {
+    console.error(err);
+    setStatus('加载失败：' + (err && err.message ? err.message : err), true);
+  }
+
+  // ---------- 运行筛选 ----------
+  function allRunLabels() {
+    return state.meta ? state.meta.runs.map(function (r) { return r.label; }) : [];
+  }
+  function runsParam() {
+    const all = allRunLabels();
+    if (state.runs.size === 0) return '__none__';
+    if (state.runs.size >= all.length) return '';
+    return Array.from(state.runs).join(',');
+  }
+  function updateRunBtn() {
+    const btn = $('#runBtn');
+    const all = allRunLabels().length;
+    let label;
+    if (state.runs.size === 0) label = '未选车次';
+    else if (state.runs.size >= all) label = '全部车次';
+    else label = '已选 ' + state.runs.size + ' / ' + all + ' 车';
+    btn.innerHTML = escapeHtml(label) + ' <span class="caret">▾</span>';
+  }
+  function renderRunOptions() {
+    const host = $('#runOptions');
+    if (!state.meta || !state.meta.runs.length) {
+      host.innerHTML = '<div class="empty">暂无车次</div>';
+      return;
+    }
+    host.innerHTML = state.meta.runs.map(function (r) {
+      const checked = state.runs.has(r.label) ? ' checked' : '';
+      return '<label class="run-op">' +
+        '<input type="checkbox" value="' + escapeHtml(r.label) + '"' + checked + '>' +
+        '<span class="lbl">' + escapeHtml(r.label) + '</span>' +
+        '<span class="meta">' + fmtInt(r.maps) + '图</span>' +
+        '</label>';
+    }).join('');
+    $$('#runOptions input').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        if (cb.checked) state.runs.add(cb.value);
+        else state.runs.delete(cb.value);
+        updateRunBtn();
+        syncHash();
+        debouncedReload();
+      });
+    });
+  }
+
+  const debouncedReload = debounce(function () { reloadCurrent(true); }, 180);
+
+  // ---------- 范围 ----------
+  function setRange(from, to, preset) {
+    if (!from || !to) return;
+    if (from > to) { const t = from; from = to; to = t; }
+    state.from = from;
+    state.to = to;
+    state.rangePreset = preset || 'custom';
+    $('#fromDate').value = from;
+    $('#toDate').value = to;
+    $$('#rangePresets button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.range === state.rangePreset);
+    });
+    syncHash();
+    reloadCurrent(true);
+  }
+  function applyPreset(preset) {
+    if (!state.meta) return;
+    const b = state.meta.bounds;
+    const to = b.to;
+    let from = b.from;
+    if (preset !== 'all') {
+      from = addDays(to, -(Number(preset) - 1));
+      if (from < b.from) from = b.from;
+    }
+    setRange(from, to, String(preset));
+  }
+  function applyDefaults() {
+    if (!state.meta) return;
+    const b = state.meta.bounds;
+    if (!state.from || !state.to) {
+      let from = addDays(b.to, -29);
+      if (from < b.from) from = b.from;
+      state.from = from;
+      state.to = b.to;
+      state.rangePreset = '30';
+    }
+    if (state.from < b.from) state.from = b.from;
+    if (state.to > b.to) state.to = b.to;
+    if (state.from > state.to) state.from = state.to;
+    $('#fromDate').value = state.from;
+    $('#toDate').value = state.to;
+  }
+
+  // ---------- 视图切换 ----------
+  function switchView(view, force) {
+    state.view = view;
+    $$('#nav button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
+    $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    highlightDate();
+    syncHash();
+    if (view === 'overview' && (force || !state.overview)) loadOverview();
+    else if (view === 'pivot' && (force || !state.pivotData)) loadPivot();
+    else if (view === 'detail' && (force || !state.detail.rows.length)) loadDetail(1);
+    else if (view === 'day' && (force || !state.day.overview)) loadDay(state.day.date || state.to);
+    if (view === 'overview') requestAnimationFrame(renderTrend);
+  }
+  function reloadCurrent(force) {
+    state.overview = null;
+    state.pivotData = null;
+    state.detail.rows = [];
+    state.day.overview = null;
+    if (state.view === 'overview') loadOverview();
+    else if (state.view === 'pivot') loadPivot();
+    else if (state.view === 'detail') loadDetail(1);
+    else if (state.view === 'day') loadDay(state.day.date || state.to);
+  }
+
+  // ---------- 概览 ----------
+  async function loadOverview() {
+    const seq = ++state.seq;
+    setStatus('加载中…');
+    $('#overviewBanner').innerHTML = '';
+    try {
+      const d = await apiGet('/api/history/overview', {
+        from: state.from, to: state.to, runs: runsParam()
+      });
+      if (seq !== state.seq) return;
+      state.overview = d;
+      renderOverview();
+      setStatus('统计 ' + fmtInt(d.totals.runs) + ' 车 · ' + fmtInt(d.totals.active_days) + ' 天 · ' + fmtInt(d.totals.events) + ' 条事件');
+    } catch (e) {
+      if (seq !== state.seq) return;
+      showError(e);
+    }
+  }
+
+  function kpi(label, value, sub, cls) {
+    return '<div class="kpi"><div class="l">' + escapeHtml(label) + '</div>' +
+      '<div class="v ' + (cls || '') + '">' + value + '</div>' +
+      (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+  }
+
+  function renderOverview() {
+    const d = state.overview;
+    if (!d) return;
+    const t = d.totals;
+
+    if (!d.totals.events) {
+      $('#overviewBanner').innerHTML = '<div class="banner info">当前范围内没有历史事件。先去挖宝，或换一个时间范围。</div>';
+    }
+
+    $('#kpiGrid').innerHTML = [
+      kpi('已挖地图', fmtInt(t.maps), '魔纹率 ' + fmtPct(t.seal_rate)),
+      kpi('出现魔纹', fmtInt(t.magic_seals), '宝物库 ' + fmtInt(t.vaults) + ' 次'),
+      kpi('出货件数', fmtInt(t.loot_qty), '每图 ' + fmtNum(t.per_map_loot)),
+      kpi('出货价值', fmtNum(t.loot_value), '按当前配置价', 'blue'),
+      kpi('系统金', fmtNum(t.gold), '', 'blue'),
+      kpi('总收入', fmtNum(t.income), '出货 + 系统金', 'good'),
+      kpi('总成本', fmtNum(t.cost), '按图分摊到日', ''),
+      kpi('盈亏', fmtNum(t.profit), '日成本为估算值', t.profit >= 0 ? 'good' : 'bad'),
+      kpi('车次', fmtInt(t.runs), '统计 ' + fmtInt(t.active_days) + ' 天'),
+      kpi('每图收入', fmtNum(t.per_map_income), '每图出货 ' + fmtNum(t.per_map_value)),
+      kpi('宝物库停留', fmtDuration(t.vault_seconds), '均次 ' + fmtDuration(d.vaults.avg_seconds)),
+      kpi('事件数', fmtInt(t.events), '层级 ' + fmtInt(t.layers) + ' 次')
+    ].join('');
+
+    renderTrend();
+    renderBars('#itemBars', d.items.slice(0, 12).map(function (it) {
+      return {
+        label: it.name,
+        value: it.value,
+        valueFmt: fmtNum(it.value),
+        sub: fmtInt(it.qty) + ' 件 · ' + (it.map || '未归类')
+      };
+    }), { fallbackKey: 'qty', fallbackFmt: fmtInt });
+
+    renderBars('#mapBars', d.map_types.map(function (m) {
+      return {
+        label: m.name,
+        value: m.value,
+        valueFmt: fmtNum(m.value),
+        sub: fmtInt(m.maps) + '图 · ' + fmtInt(m.seals) + '魔纹',
+        cls: 'green'
+      };
+    }));
+
+    renderBars('#layerBars', d.layers.map(function (l) {
+      return { label: l.name, value: l.count, valueFmt: fmtInt(l.count), sub: '', cls: 'blue' };
+    }), { noSub: true });
+
+    drawColumnChart($('#hourChart'), d.hours.map(function (h) {
+      return { label: h.hour, value: h.events };
+    }), { color: '#8fc7e8', labelSuffix: '时' });
+
+    drawColumnChart($('#weekdayChart'), d.weekdays.map(function (w) {
+      return { label: w.weekday, value: w.events };
+    }), { color: '#c9a8e8' });
+
+    renderRunTable(d.runs);
+    renderNotes(d.notes);
+  }
+
+  function renderNotes(notes) {
+    if (!notes) { $('#notes').innerHTML = ''; return; }
+    const labels = { price: '物品价值', cost: '成本 / 盈亏', vault: '宝物库时长', map: '地图类型' };
+    const items = [];
+    Object.keys(notes).forEach(function (k) {
+      items.push('<b>' + escapeHtml(labels[k] || k) + '：</b>' + escapeHtml(notes[k]));
+    });
+    $('#notes').innerHTML = items.join('<br>') +
+      '<br><b>金额：</b>按原始数值展示，未做万单位换算。';
+  }
+
+  function renderBars(sel, items, opts) {
+    opts = opts || {};
+    const host = $(sel);
+    if (!items || !items.length) { host.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    let max = Math.max.apply(null, items.map(function (x) { return Math.abs(Number(x.value) || 0); }));
+    let useFallback = false;
+    if (!max && opts.fallbackKey) {
+      useFallback = true;
+      max = Math.max.apply(null, items.map(function (x) { return Math.abs(Number(x[opts.fallbackKey]) || 0); }));
+    }
+    if (!max) max = 1;
+    host.innerHTML = items.map(function (x) {
+      let v = Number(x.value) || 0;
+      let text = x.valueFmt;
+      if (useFallback) {
+        v = Number(x[opts.fallbackKey]) || 0;
+        text = opts.fallbackFmt ? opts.fallbackFmt(v) : fmtNum(v);
+      }
+      const w = Math.max(1, Math.round(Math.abs(v) / max * 100));
+      return '<div class="bar-row">' +
+        '<div class="bar-label" title="' + escapeHtml(x.label) + '">' + escapeHtml(x.label) + '</div>' +
+        '<div class="bar-track"><div class="bar-fill ' + (x.cls || '') + '" style="width:' + w + '%"></div></div>' +
+        '<div class="bar-val">' + text + '</div>' +
+        (opts.noSub ? '' : '<div class="bar-sub" title="' + escapeHtml(x.sub || '') + '">' + escapeHtml(x.sub || '') + '</div>') +
+        '</div>';
+    }).join('');
+  }
+
+  function renderRunTable(runs) {
+    if (!runs || !runs.length) {
+      $('#runTable').innerHTML = '<div class="empty">暂无车次</div>';
+      $('#runTableHint').textContent = '';
+      return;
+    }
+    $('#runTableHint').textContent = '按开始时间倒序';
+    let html = '<table class="data"><thead><tr>' +
+      '<th>车次</th><th class="num">地图</th><th class="num">魔纹</th><th class="num">魔纹率</th>' +
+      '<th class="num">出货</th><th class="num">出货价值</th><th class="num">系统金</th>' +
+      '<th class="num">收入</th><th class="num">成本</th><th class="num">盈亏</th>' +
+      '<th class="num">时长</th><th class="num">宝物库</th><th>状态</th>' +
+      '</tr></thead><tbody>';
+    runs.forEach(function (r) {
+      const pcls = r.profit >= 0 ? 'good' : 'bad';
+      html += '<tr>' +
+        '<td class="mono">' + escapeHtml(r.label) + '</td>' +
+        '<td class="num">' + fmtInt(r.maps) + '</td>' +
+        '<td class="num">' + fmtInt(r.seals) + '</td>' +
+        '<td class="num">' + fmtPct(r.seal_rate) + '</td>' +
+        '<td class="num">' + fmtInt(r.loot_qty) + '</td>' +
+        '<td class="num">' + fmtNum(r.loot_value) + '</td>' +
+        '<td class="num">' + fmtNum(r.gold) + '</td>' +
+        '<td class="num">' + fmtNum(r.income) + '</td>' +
+        '<td class="num">' + fmtNum(r.cost) + '</td>' +
+        '<td class="num ' + pcls + '">' + fmtNum(r.profit) + '</td>' +
+        '<td class="num">' + fmtDuration(r.elapsed) + '</td>' +
+        '<td class="num">' + fmtInt(r.vaults) + '</td>' +
+        '<td>' + (r.has_summary ? '<span style="color:#8fd18f">已结算</span>' : '<span style="color:#757583">未结算</span>') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    $('#runTable').innerHTML = html;
+  }
+
+  // ---------- 图表 ----------
+  function niceMax(v) {
+    if (!v || v <= 0) return 1;
+    const exp = Math.pow(10, Math.floor(Math.log10(v)));
+    const f = v / exp;
+    const nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+    return nf * exp;
+  }
+
+  function renderTrend() {
+    const d = state.overview;
+    if (!d) return;
+    const metric = state.trendMetric;
+    const colors = {
+      maps: '#f0d080', seals: '#c9a8e8', loot_qty: '#8fd18f', loot_value: '#8fc7e8',
+      gold: '#e8c48f', income: '#8fd18f', profit: '#e58b8b'
+    };
+    const series = d.daily.map(function (x) {
+      return { label: x.date, value: Number(x[metric]) || 0 };
+    });
+    drawLineChart($('#trendChart'), series, {
+      color: colors[metric] || '#f0d080',
+      axisFmt: fmtCompact,
+      valueFmt: metric === 'profit' ? fmtNum : (metric === 'loot_value' || metric === 'gold' || metric === 'income' ? fmtNum : fmtInt)
+    });
+  }
+
+  function drawLineChart(host, series, opts) {
+    opts = opts || {};
+    host.innerHTML = '';
+    if (!series || !series.length || series.every(function (p) { return !p.value; })) {
+      host.innerHTML = '<div class="empty">暂无数据</div>';
+      return;
+    }
+    const W = Math.max(320, host.clientWidth || 720);
+    const H = opts.height || 240;
+    const L = 58, R = 16, T = 16, B = 30;
+    const iw = W - L - R, ih = H - T - B;
+    const n = series.length;
+    const vals = series.map(function (p) { return p.value; });
+    const vmaxRaw = Math.max.apply(null, vals.concat([0]));
+    const vminRaw = Math.min.apply(null, vals.concat([0]));
+    const axisMax = niceMax(vmaxRaw > 0 ? vmaxRaw : 1);
+    const axisMin = vminRaw < 0 ? -niceMax(-vminRaw) : 0;
+    const span = (axisMax - axisMin) || 1;
+    const axisFmt = opts.axisFmt || fmtCompact;
+    const valFmt = opts.valueFmt || fmtNum;
+    const color = opts.color || '#f0d080';
+    const X = function (i) { return n === 1 ? L + iw / 2 : L + i * iw / (n - 1); };
+    const Y = function (v) { return T + ih - ((v - axisMin) / span) * ih; };
+    const baseY = Y(0);
+
+    let grid = '';
+    for (let i = 0; i <= 4; i++) {
+      const gy = T + ih * i / 4;
+      const gv = axisMax - span * i / 4;
+      grid += '<line class="grid" x1="' + L + '" y1="' + gy + '" x2="' + (W - R) + '" y2="' + gy + '"></line>' +
+        '<text class="axis" x="' + (L - 8) + '" y="' + (gy + 4) + '" text-anchor="end">' + axisFmt(gv) + '</text>';
+    }
+    const step = Math.max(1, Math.ceil(n / 8));
+    for (let i = 0; i < n; i += step) {
+      const label = series[i].label.length >= 10 ? series[i].label.slice(5) : series[i].label;
+      grid += '<text class="axis" x="' + X(i) + '" y="' + (H - 9) + '" text-anchor="middle">' + escapeHtml(label) + '</text>';
+    }
+    const pts = series.map(function (p, i) { return X(i) + ',' + Y(p.value); });
+    const area = 'M ' + X(0) + ',' + baseY + ' L ' + pts.join(' L ') + ' L ' + X(n - 1) + ',' + baseY + ' Z';
+    let dots = '';
+    series.forEach(function (p, i) {
+      dots += '<circle class="dot" cx="' + X(i) + '" cy="' + Y(p.value) + '" r="2.6" fill="' + color + '">' +
+        '<title>' + escapeHtml(p.label) + '：' + valFmt(p.value) + '</title></circle>';
+    });
+
+    host.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+      grid +
+      '<path class="area" d="' + area + '" fill="' + color + '"></path>' +
+      '<polyline class="line" points="' + pts.join(' ') + '" stroke="' + color + '"></polyline>' +
+      dots +
+      '<line class="hover-line" x1="0" y1="' + T + '" x2="0" y2="' + (T + ih) + '" stroke="#6a6a78" stroke-width="1" opacity="0"></line>' +
+      '<rect class="hover-layer" x="' + L + '" y="' + T + '" width="' + iw + '" height="' + ih + '"></rect>' +
+      '</svg>';
+
+    const svg = $('svg', host);
+    const overlay = $('.hover-layer', svg);
+    const hoverLine = $('.hover-line', svg);
+    const tip = document.createElement('div');
+    tip.className = 'chart-tip hidden';
+    host.appendChild(tip);
+
+    overlay.addEventListener('mousemove', function (ev) {
+      const rect = svg.getBoundingClientRect();
+      const scale = W / rect.width;
+      const px = (ev.clientX - rect.left) * scale;
+      let idx = n === 1 ? 0 : Math.round((px - L) / (iw / (n - 1)));
+      idx = Math.max(0, Math.min(n - 1, idx));
+      const p = series[idx];
+      const cx = X(idx);
+      hoverLine.setAttribute('x1', cx);
+      hoverLine.setAttribute('x2', cx);
+      hoverLine.setAttribute('opacity', '1');
+      tip.innerHTML = escapeHtml(p.label) + '<br><b style="color:' + color + '">' + valFmt(p.value) + '</b>';
+      tip.classList.remove('hidden');
+      const hx = ev.clientX - host.getBoundingClientRect().left;
+      tip.style.left = Math.max(4, Math.min(host.clientWidth - 120, hx + 10)) + 'px';
+      tip.style.top = '8px';
+    });
+    overlay.addEventListener('mouseleave', function () {
+      tip.classList.add('hidden');
+      hoverLine.setAttribute('opacity', '0');
+    });
+  }
+
+  function drawColumnChart(host, data, opts) {
+    opts = opts || {};
+    host.innerHTML = '';
+    if (!data || !data.length) { host.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    const W = Math.max(320, host.clientWidth || 720);
+    const H = opts.height || 240;
+    const L = 50, R = 14, T = 14, B = 26;
+    const iw = W - L - R, ih = H - T - B;
+    const n = data.length;
+    const max = niceMax(Math.max.apply(null, data.map(function (d) { return d.value; })));
+    const color = opts.color || '#8fc7e8';
+    const bw = Math.max(4, iw / n * 0.62);
+    let grid = '';
+    for (let i = 0; i <= 4; i++) {
+      const gy = T + ih * i / 4;
+      const gv = max * (4 - i) / 4;
+      grid += '<line class="grid" x1="' + L + '" y1="' + gy + '" x2="' + (W - R) + '" y2="' + gy + '"></line>' +
+        '<text class="axis" x="' + (L - 8) + '" y="' + (gy + 4) + '" text-anchor="end">' + fmtCompact(gv) + '</text>';
+    }
+    let bars = '';
+    data.forEach(function (d, i) {
+      const cx = L + (i + 0.5) * iw / n;
+      const bh = d.value > 0 ? Math.max(1, d.value / max * ih) : 0;
+      if (bh <= 0) return;
+      bars += '<rect class="bar" x="' + (cx - bw / 2) + '" y="' + (T + ih - bh) + '" width="' + bw + '" height="' + bh + '" rx="2" fill="' + color + '">' +
+        '<title>' + escapeHtml(d.label + (opts.labelSuffix || '') + '：' + fmtInt(d.value)) + '</title></rect>';
+    });
+    const step = Math.max(1, Math.ceil(n / 12));
+    for (let i = 0; i < n; i += step) {
+      const cx = L + (i + 0.5) * iw / n;
+      bars += '<text class="axis" x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + escapeHtml(data[i].label) + '</text>';
+    }
+    host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + grid + bars + '</svg>';
+  }
+
+  // ---------- 透视表 ----------
+  async function loadPivot() {
+    const seq = ++state.seq;
+    setStatus('透视加载中…');
+    try {
+      const d = await apiGet('/api/history/pivot', {
+        from: state.from, to: state.to, runs: runsParam(),
+        row: state.pivotRow, col: state.pivotCol, measure: state.pivotMeasure
+      });
+      if (seq !== state.seq) return;
+      state.pivotData = d;
+      renderPivot();
+      setStatus('透视 ' + fmtInt(d.rows.length) + ' 行 × ' + fmtInt(d.cols.length) + ' 列');
+    } catch (e) {
+      if (seq !== state.seq) return;
+      showError(e);
+    }
+  }
+
+  function dimDisplay(dim, value) {
+    if (dim === 'week') return value + ' 起';
+    if (dim === 'hour') return value + ':00';
+    if (dim === 'map' && (value === '混合' || value === '未标注')) return value;
+    return value;
+  }
+  function measureFmt(measure, v) {
+    if (measure === 'value' || measure === 'gold' || measure === 'custom') return fmtNum(v);
+    return fmtInt(v);
+  }
+
+  function renderPivot() {
+    const d = state.pivotData;
+    const host = $('#pivotTable');
+    if (!d || !d.rows.length || !d.cols.length) {
+      host.innerHTML = '<div class="empty">当前范围没有可透视的数据</div>';
+      $('#pivotHint').textContent = '';
+      return;
+    }
+    const matrix = d.rows.map(function () { return d.cols.map(function () { return 0; }); });
+    d.cells.forEach(function (c) {
+      if (matrix[c.r] && matrix[c.r][c.c] !== undefined) matrix[c.r][c.c] = c.v;
+    });
+
+    let html = '<table class="pivot"><thead><tr>' +
+      '<th class="corner">' + escapeHtml(d.row_label) + ' \\ ' + escapeHtml(d.col_label) + '</th>';
+    d.cols.forEach(function (c) {
+      html += '<th>' + escapeHtml(dimDisplay(d.col, c)) + '</th>';
+    });
+    html += '<th class="total">合计</th></tr></thead><tbody>';
+
+    d.rows.forEach(function (r, ri) {
+      html += '<tr><th title="' + escapeHtml(r) + '">' + escapeHtml(dimDisplay(d.row, r)) + '</th>';
+      d.cols.forEach(function (c, ci) {
+        const v = matrix[ri][ci];
+        html += '<td class="cell' + (v ? '' : ' zero') + '" data-r="' + ri + '" data-c="' + ci + '">' +
+          (v ? measureFmt(d.measure, v) : '·') + '</td>';
+      });
+      html += '<td class="total">' + measureFmt(d.measure, d.row_totals[ri]) + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr><th>合计</th>';
+    d.cols.forEach(function (c, ci) {
+      html += '<td>' + measureFmt(d.measure, d.col_totals[ci]) + '</td>';
+    });
+    html += '<td class="total">' + measureFmt(d.measure, d.grand) + '</td></tr></tfoot></table>';
+    host.innerHTML = html;
+
+    $('#pivotHint').textContent = '提示：点击任意数值单元格可下钻查看明细；' +
+      (d.truncated ? '结果超过 500 行/列，已截断。' : '') +
+      ' 地图类型中「混合」「未标注」表示该车次无法唯一归类。';
+
+    $$('#pivotTable td.cell').forEach(function (td) {
+      td.addEventListener('click', function () {
+        const ri = Number(td.dataset.r), ci = Number(td.dataset.c);
+        if (!matrix[ri][ci]) return;
+        openDrill(d.rows[ri], d.cols[ci], td.textContent);
+      });
+    });
+  }
+
+  function pivotCsv() {
+    const d = state.pivotData;
+    if (!d) return;
+    const matrix = d.rows.map(function () { return d.cols.map(function () { return 0; }); });
+    d.cells.forEach(function (c) { if (matrix[c.r]) matrix[c.r][c.c] = c.v; });
+    const rows = [];
+    rows.push([d.row_label + '\\' + d.col_label].concat(d.cols.map(function (c) { return dimDisplay(d.col, c); })).concat(['合计']));
+    d.rows.forEach(function (r, ri) {
+      rows.push([dimDisplay(d.row, r)].concat(matrix[ri].map(function (v) { return v ? measureFmt(d.measure, v) : ''; })).concat([measureFmt(d.measure, d.row_totals[ri])]));
+    });
+    rows.push(['合计'].concat(d.col_totals.map(function (v) { return measureFmt(d.measure, v); })).concat([measureFmt(d.measure, d.grand)]));
+    downloadCsv('挖宝透视_' + state.from + '_' + state.to + '.csv', rows);
+  }
+
+  // ---------- 明细 ----------
+  function fillFilterSelects() {
+    const typeSel = $('#fType');
+    typeSel.innerHTML = '<option value="">全部类型</option>' +
+      Object.keys(TYPE_LABEL).map(function (k) {
+        return '<option value="' + k + '">' + TYPE_LABEL[k] + '</option>';
+      }).join('');
+    const itemSel = $('#fItem');
+    itemSel.innerHTML = '<option value="">全部物品</option>' +
+      (state.meta ? state.meta.items.map(function (i) {
+        return '<option value="' + escapeHtml(i.name) + '">' + escapeHtml(i.name) + '</option>';
+      }).join('') : '');
+    const layerSel = $('#fLayer');
+    layerSel.innerHTML = '<option value="">全部层级</option>' +
+      (state.meta ? state.meta.layers.map(function (l) {
+        return '<option value="' + escapeHtml(l) + '">' + escapeHtml(l) + '</option>';
+      }).join('') : '');
+  }
+
+  function detailParams(page) {
+    const f = state.detail.filters;
+    return {
+      from: state.from, to: state.to, runs: runsParam(),
+      type: f.type || '', items: f.item || '', layer: f.layer || '',
+      vault: f.vault || '', zone: f.zone || '', q: f.keyword || '',
+      page: page || state.detail.page, size: state.detail.size
+    };
+  }
+
+  async function loadDetail(page) {
+    const seq = ++state.seq;
+    state.detail.page = page || 1;
+    setStatus('明细加载中…');
+    try {
+      const d = await apiGet('/api/history/detail', detailParams(state.detail.page));
+      if (seq !== state.seq) return;
+      state.detail.total = d.total;
+      state.detail.rows = d.rows;
+      renderDetail();
+      setStatus('明细 ' + fmtInt(d.total) + ' 条');
+    } catch (e) {
+      if (seq !== state.seq) return;
+      showError(e);
+    }
+  }
+
+  function renderDetail() {
+    const host = $('#detailTable');
+    const d = state.detail;
+    if (!d.rows.length) {
+      host.innerHTML = '<div class="empty">没有符合条件的记录</div>';
+      renderPager();
+      return;
+    }
+    let html = '<table class="data"><thead><tr>' +
+      '<th>时间</th><th>车次</th><th>类型</th><th>名称</th>' +
+      '<th class="num">数量</th><th class="num">单价</th><th class="num">价值</th>' +
+      '<th class="num">系统金</th><th>宝物库</th><th>区域</th>' +
+      '</tr></thead><tbody>';
+    d.rows.forEach(function (r) {
+      const gold = r.type === 'system_gold' ? fmtNum(r.gold) : '';
+      html += '<tr>' +
+        '<td class="mono">' + escapeHtml(r.ts.replace('T', ' ')) + '</td>' +
+        '<td class="mono">' + escapeHtml(r.run) + '</td>' +
+        '<td>' + escapeHtml(TYPE_LABEL[r.type] || r.type) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name || '—') + '</td>' +
+        '<td class="num">' + (r.type === 'loot' ? fmtInt(r.qty) : '—') + '</td>' +
+        '<td class="num">' + (r.type === 'loot' ? fmtNum(r.price) : '') + '</td>' +
+        '<td class="num">' + (r.type === 'loot' ? fmtNum(r.value) : '') + '</td>' +
+        '<td class="num">' + gold + '</td>' +
+        '<td>' + escapeHtml(r.vault || '') + '</td>' +
+        '<td>' + escapeHtml(r.zone || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    host.innerHTML = html;
+    renderPager();
+  }
+
+  function renderPager() {
+    const d = state.detail;
+    const pages = Math.max(1, Math.ceil(d.total / d.size));
+    const p = Math.min(d.page, pages);
+    $('#detailPager').innerHTML =
+      '<span>共 ' + fmtInt(d.total) + ' 条 · 第 ' + p + ' / ' + pages + ' 页</span>' +
+      '<button class="btn" id="pgPrev"' + (p <= 1 ? ' disabled' : '') + '>上一页</button>' +
+      '<button class="btn" id="pgNext"' + (p >= pages ? ' disabled' : '') + '>下一页</button>';
+    const prev = $('#pgPrev'), next = $('#pgNext');
+    if (prev) prev.addEventListener('click', function () { loadDetail(p - 1); });
+    if (next) next.addEventListener('click', function () { loadDetail(p + 1); });
+  }
+
+  async function detailCsv() {
+    try {
+      setStatus('准备导出…');
+      const d = await apiGet('/api/history/detail', detailParams(1));
+      const size = Math.min(d.total, 5000);
+      const all = await apiGet('/api/history/detail', Object.assign(detailParams(1), { size: size }));
+      const rows = [['时间', '车次', '类型', '名称', '数量', '单价', '价值', '系统金', '宝物库', '区域']];
+      (all.rows || []).forEach(function (r) {
+        rows.push([r.ts, r.run, TYPE_LABEL[r.type] || r.type, r.name, r.qty, r.price, r.value, r.gold, r.vault, r.zone]);
+      });
+      downloadCsv('挖宝明细_' + state.from + '_' + state.to + '.csv', rows);
+      setStatus('已导出 ' + fmtInt(rows.length - 1) + ' 条');
+    } catch (e) { showError(e); }
+  }
+
+  // ---------- 单日 ----------
+  async function loadDay(date) {
+    if (!date) date = state.to;
+    state.day.date = date;
+    $('#dayDate').value = date;
+    syncHash();
+    const seq = ++state.seq;
+    setStatus('单日加载中…');
+    try {
+      const results = await Promise.all([
+        apiGet('/api/history/overview', { from: date, to: date, runs: runsParam() }),
+        apiGet('/api/history/detail', {
+          from: date, to: date, runs: runsParam(), size: 4000, page: 1
+        })
+      ]);
+      if (seq !== state.seq) return;
+      state.day.overview = results[0];
+      state.day.rows = results[1].rows;
+      renderDay();
+      setStatus(date + ' · ' + fmtInt(results[0].totals.events) + ' 条事件');
+    } catch (e) {
+      if (seq !== state.seq) return;
+      showError(e);
+    }
+  }
+
+  function renderDay() {
+    const ov = state.day.overview;
+    if (!ov) return;
+    const t = ov.totals;
+    $('#dayKpi').innerHTML = [
+      kpi('已挖地图', fmtInt(t.maps), '魔纹率 ' + fmtPct(t.seal_rate)),
+      kpi('魔纹', fmtInt(t.magic_seals), '宝物库 ' + fmtInt(t.vaults) + ' 次'),
+      kpi('出货', fmtInt(t.loot_qty), '价值 ' + fmtNum(t.loot_value)),
+      kpi('系统金', fmtNum(t.gold), ''),
+      kpi('收入', fmtNum(t.income), '出货 + 系统金', 'good'),
+      kpi('成本(估算)', fmtNum(t.cost), '按图分摊', ''),
+      kpi('盈亏(估算)', fmtNum(t.profit), '', t.profit >= 0 ? 'good' : 'bad'),
+      kpi('事件', fmtInt(t.events), '层级 ' + fmtInt(t.layers))
+    ].join('');
+
+    renderBars('#dayItems', ov.items.map(function (it) {
+      return { label: it.name, value: it.qty, valueFmt: fmtInt(it.qty), sub: '价值 ' + fmtNum(it.value) };
+    }), { noSub: false });
+    renderBars('#dayLayers', ov.layers.map(function (l) {
+      return { label: l.name, value: l.count, valueFmt: fmtInt(l.count), cls: 'blue' };
+    }), { noSub: true });
+    if (!ov.layers.length) $('#dayLayers').innerHTML = '<div class="empty">当天没有层级记录</div>';
+
+    const rows = state.day.rows.slice().sort(function (a, b) { return a.ts < b.ts ? -1 : 1; });
+    if (!rows.length) {
+      $('#dayTimeline').innerHTML = '<div class="empty">当天没有事件</div>';
+      return;
+    }
+    $('#dayTimeline').innerHTML = rows.map(function (r) {
+      let icon = '·', text = '', cls = '';
+      if (r.type === 'loot') { icon = '📦'; cls = 'loot'; text = '获得 ' + escapeHtml(r.name) + ' ×' + fmtInt(r.qty) + (r.value ? '（' + fmtNum(r.value) + '）' : ''); }
+      else if (r.type === 'layer') { icon = '▶'; cls = 'layer'; text = '层级 ' + escapeHtml(r.name); }
+      else if (r.type === 'map_complete') { icon = '🗺️'; cls = 'map_complete'; text = '挖宝图完成'; }
+      else if (r.type === 'magic_seal') { icon = '✨'; cls = 'magic_seal'; text = '魔纹出现'; }
+      else if (r.type === 'system_gold') { icon = '💰'; cls = 'custom'; text = '系统金 +' + fmtNum(r.gold); }
+      else { icon = '📋'; cls = 'custom'; text = escapeHtml(r.name || r.type) + ' = ' + fmtNum(r.qty); }
+      const vault = r.vault ? '<span class="vault-tag">[✨' + escapeHtml(r.vault) + ']</span>' : '';
+      return '<div class="tl-row ' + cls + '">' +
+        '<span class="tl-time">' + escapeHtml(r.time || '') + '</span>' +
+        '<span class="tl-icon">' + icon + '</span>' +
+        '<span class="tl-text">' + text + vault + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  // ---------- 下钻 ----------
+  function buildDrillParams(rowVal, colVal, measure) {
+    const d = state.pivotData;
+    const params = {};
+    const ranges = [];
+    const itemSets = [];
+    let run = '';
+
+    function applyDim(dim, val) {
+      if (!val) return;
+      if (dim === 'date') ranges.push([val, val]);
+      else if (dim === 'week') ranges.push([val, addDays(val, 6)]);
+      else if (dim === 'month') ranges.push([val + '-01', lastDayOfMonth(val)]);
+      else if (dim === 'run') run = val;
+      else if (dim === 'item') itemSets.push([val]);
+      else if (dim === 'layer') params.layer = val;
+      else if (dim === 'hour') params.hour = val;
+      else if (dim === 'weekday') params.weekday = sqliteWeekday(val);
+      else if (dim === 'vault') params.vault = val;
+      else if (dim === 'zone') params.zone = val;
+      else if (dim === 'custom') params.custom = val;
+      else if (dim === 'map') {
+        const m = state.meta ? state.meta.maps.find(function (x) { return x.name === val; }) : null;
+        if (m && m.items && m.items.length) itemSets.push(m.items);
+        else if (val === '混合' || val === '未标注') params._ambiguousMap = val;
+      }
+    }
+    applyDim(d.row, rowVal);
+    applyDim(d.col, colVal);
+
+    if (ranges.length) {
+      let from = ranges[0][0], to = ranges[0][1];
+      ranges.forEach(function (r) {
+        if (r[0] > from) from = r[0];
+        if (r[1] < to) to = r[1];
+      });
+      params.from = from;
+      params.to = to;
+    }
+    if (run) params.runs = run;
+    else params.runs = runsParam();
+    if (itemSets.length) {
+      let list = itemSets[0].slice();
+      itemSets.slice(1).forEach(function (set) {
+        list = list.filter(function (x) { return set.indexOf(x) >= 0; });
+      });
+      params.items = list.join(',');
+      if (!list.length) params._emptyItems = true;
+    }
+    return params;
+  }
+
+  async function openDrill(rowVal, colVal, cellText) {
+    const d = state.pivotData;
+    const title = dimDisplay(d.row, rowVal) + ' × ' + dimDisplay(d.col, colVal);
+    $('#modalTitle').textContent = '下钻 · ' + title + ' · ' + d.measure_label + ' ' + cellText;
+    $('#modalNote').textContent = '';
+    $('#modalTable').innerHTML = '<div class="empty">加载中…</div>';
+    $('#modal').classList.remove('hidden');
+
+    const params = buildDrillParams(rowVal, colVal, d.measure);
+    if (params._ambiguousMap) {
+      $('#modalTable').innerHTML = '<div class="empty">该车次无法唯一归类到某个地图类型（' + escapeHtml(params._ambiguousMap) + '），无法按地图类型下钻。</div>';
+      return;
+    }
+    if (params._emptyItems) {
+      $('#modalTable').innerHTML = '<div class="empty">该地图类型下没有配置物品，无法下钻。</div>';
+      return;
+    }
+    delete params._ambiguousMap;
+    delete params._emptyItems;
+    params.page = 1;
+    params.size = 200;
+    try {
+      const res = await apiGet('/api/history/detail', params);
+      $('#modalNote').textContent = '共 ' + fmtInt(res.total) + ' 条，显示前 ' + fmtInt(res.rows.length) + ' 条';
+      if (!res.rows.length) {
+        $('#modalTable').innerHTML = '<div class="empty">没有匹配的明细</div>';
+        return;
+      }
+      let html = '<table class="data"><thead><tr><th>时间</th><th>车次</th><th>类型</th><th>名称</th>' +
+        '<th class="num">数量</th><th class="num">价值</th><th class="num">系统金</th><th>宝物库</th></tr></thead><tbody>';
+      res.rows.forEach(function (r) {
+        html += '<tr><td class="mono">' + escapeHtml(r.ts.replace('T', ' ')) + '</td>' +
+          '<td class="mono">' + escapeHtml(r.run) + '</td>' +
+          '<td>' + escapeHtml(TYPE_LABEL[r.type] || r.type) + '</td>' +
+          '<td class="name">' + escapeHtml(r.name || '—') + '</td>' +
+          '<td class="num">' + (r.type === 'loot' ? fmtInt(r.qty) : '—') + '</td>' +
+          '<td class="num">' + (r.type === 'loot' ? fmtNum(r.value) : '') + '</td>' +
+          '<td class="num">' + (r.type === 'system_gold' ? fmtNum(r.gold) : '') + '</td>' +
+          '<td>' + escapeHtml(r.vault || '') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      $('#modalTable').innerHTML = html;
+    } catch (e) {
+      $('#modalTable').innerHTML = '<div class="empty">加载失败：' + escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function closeModal() { $('#modal').classList.add('hidden'); }
+
+  // ---------- CSV ----------
+  function csvCell(v) {
+    const s = v === null || v === undefined ? '' : String(v);
+    if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function downloadCsv(filename, rows) {
+    const csv = rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }
+
+  // ---------- 元数据 ----------
+  async function loadMeta() {
+    try {
+      state.meta = await apiGet('/api/history/meta');
+    } catch (e) {
+      showError(e);
+      $('#overviewBanner').innerHTML = '<div class="banner">无法连接插件服务。请确认插件已启动、端口正确（默认 8765），或从插件面板打开历史页。</div>';
+      return false;
+    }
+    if (!state.meta.runs) state.meta.runs = [];
+    if (!state.meta.items) state.meta.items = [];
+    if (!state.meta.layers) state.meta.layers = [];
+    if (!state.meta.maps) state.meta.maps = [];
+    return true;
+  }
+
+  function renderMetaFoot() {
+    const m = state.meta;
+    if (!m) return;
+    $('#railFoot').innerHTML = m.dates.length
+      ? escapeHtml(m.bounds.from) + ' ~ ' + escapeHtml(m.bounds.to) + '<br>' + fmtInt(m.runs.length) + ' 车 · ' + fmtInt(m.dates.length) + ' 天'
+      : '暂无历史数据';
+    if (!m.dates.length) {
+      $('#overviewBanner').innerHTML = '<div class="banner info">数据库里还没有历史事件。挖一次宝后再回来看看。</div>';
+    }
   }
 
   function renderDateList() {
-    const filtered = allDates.filter(d => d.startsWith(currentMonth));
-    const list = document.getElementById('dateList');
-    list.innerHTML = filtered.map(d =>
-      '<div class="date-item' + (d === currentDate ? ' active' : '') +
-      '" data-date="' + d + '">' + d + '</div>'
-    ).join('');
-    list.querySelectorAll('.date-item').forEach(el => {
-      el.addEventListener('click', () => selectDate(el.dataset.date));
+    const host = $('#dateList');
+    if (!state.meta || !state.meta.dates.length) {
+      host.innerHTML = '<div class="empty" style="padding:12px">暂无</div>';
+      return;
+    }
+    host.innerHTML = state.meta.dates.map(function (d) {
+      return '<div class="date-item" data-date="' + escapeHtml(d) + '">' +
+        '<span>' + escapeHtml(d) + '</span></div>';
+    }).join('');
+    $$('#dateList .date-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        state.day.date = el.dataset.date;
+        switchView('day', true);
+      });
+    });
+    highlightDate();
+  }
+  function highlightDate() {
+    $$('#dateList .date-item').forEach(function (el) {
+      el.classList.toggle('active', state.view === 'day' && el.dataset.date === state.day.date);
     });
   }
 
-  function selectDate(date) {
-    currentDate = date;
+  function fillControlSelects() {
+    const dims = Object.keys(DIM_LABEL);
+    $('#pivotRow').innerHTML = dims.map(function (k) {
+      return '<option value="' + k + '">' + DIM_LABEL[k] + '</option>';
+    }).join('');
+    $('#pivotCol').innerHTML = $('#pivotRow').innerHTML;
+    $('#pivotMeasure').innerHTML = Object.keys(MEASURE_LABEL).map(function (k) {
+      return '<option value="' + k + '">' + MEASURE_LABEL[k] + '</option>';
+    }).join('');
+    $('#pivotRow').value = state.pivotRow;
+    $('#pivotCol').value = state.pivotCol;
+    $('#pivotMeasure').value = state.pivotMeasure;
+  }
+
+  // ---------- hash ----------
+  function syncHash() {
+    const parts = ['view=' + encodeURIComponent(state.view)];
+    if (state.from) parts.push('from=' + state.from);
+    if (state.to) parts.push('to=' + state.to);
+    if (state.meta && state.runs.size > 0 && state.runs.size < state.meta.runs.length) {
+      parts.push('runs=' + encodeURIComponent(Array.from(state.runs).join(',')));
+    } else if (state.runs.size === 0) {
+      parts.push('runs=__none__');
+    }
+    parts.push('metric=' + state.trendMetric);
+    parts.push('row=' + state.pivotRow, 'col=' + state.pivotCol, 'measure=' + state.pivotMeasure);
+    if (state.view === 'day' && state.day.date) parts.push('day=' + encodeURIComponent(state.day.date));
+    try { history.replaceState(null, '', '#' + parts.join('&')); } catch (e) { }
+  }
+  function parseHash() {
+    const out = {};
+    const h = (location.hash || '').replace(/^#/, '');
+    if (!h) return out;
+    h.split('&').forEach(function (kv) {
+      const i = kv.indexOf('=');
+      if (i < 0) return;
+      out[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+    });
+    return out;
+  }
+  function applyHash() {
+    const h = parseHash();
+    if (h.view) state.view = h.view;
+    if (h.from) { state.from = h.from; state.rangePreset = 'custom'; }
+    if (h.to) { state.to = h.to; state.rangePreset = 'custom'; }
+    if (h.metric) state.trendMetric = h.metric;
+    if (h.row) state.pivotRow = h.row;
+    if (h.col) state.pivotCol = h.col;
+    if (h.measure) state.pivotMeasure = h.measure;
+    if (h.day) state.day.date = h.day;
+    state.hashRuns = h.runs;
+  }
+
+  // ---------- 绑定 ----------
+  function bindUI() {
+    $$('#nav button').forEach(function (b) {
+      b.addEventListener('click', function () { switchView(b.dataset.view, false); highlightDate(); });
+    });
+    $$('#rangePresets button').forEach(function (b) {
+      b.addEventListener('click', function () { applyPreset(b.dataset.range); });
+    });
+    $('#fromDate').addEventListener('change', function () {
+      setRange(this.value, state.to, 'custom');
+    });
+    $('#toDate').addEventListener('change', function () {
+      setRange(state.from, this.value, 'custom');
+    });
+    $('#refreshBtn').addEventListener('click', function () { reloadCurrent(true); });
+
+    $('#runBtn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      $('#runPopover').classList.toggle('hidden');
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.run-filter')) $('#runPopover').classList.add('hidden');
+    });
+    $('#runAll').addEventListener('click', function () {
+      allRunLabels().forEach(function (l) { state.runs.add(l); });
+      renderRunOptions(); updateRunBtn(); syncHash(); reloadCurrent(true);
+    });
+    $('#runNone').addEventListener('click', function () {
+      state.runs.clear();
+      renderRunOptions(); updateRunBtn(); syncHash(); reloadCurrent(true);
+    });
+
+    $('#trendMetric').addEventListener('click', function (e) {
+      const b = e.target.closest('button[data-metric]');
+      if (!b) return;
+      state.trendMetric = b.dataset.metric;
+      $$('#trendMetric button').forEach(function (x) { x.classList.toggle('active', x === b); });
+      renderTrend(); syncHash();
+    });
+
+    $('#pivotRow').addEventListener('change', function () {
+      state.pivotRow = this.value;
+      state.pivotData = null;
+      syncHash(); loadPivot();
+    });
+    $('#pivotCol').addEventListener('change', function () {
+      state.pivotCol = this.value;
+      state.pivotData = null;
+      syncHash(); loadPivot();
+    });
+    $('#pivotMeasure').addEventListener('change', function () {
+      state.pivotMeasure = this.value;
+      state.pivotData = null;
+      syncHash(); loadPivot();
+    });
+    $('#pivotExport').addEventListener('click', pivotCsv);
+
+    $('#fApply').addEventListener('click', function () {
+      state.detail.filters = {
+        type: $('#fType').value,
+        item: $('#fItem').value,
+        layer: $('#fLayer').value,
+        vault: $('#fVault').value.trim(),
+        zone: $('#fZone').value.trim(),
+        keyword: $('#fKeyword').value.trim()
+      };
+      state.detail.page = 1;
+      loadDetail(1);
+    });
+    $('#fReset').addEventListener('click', function () {
+      $('#fType').value = ''; $('#fItem').value = ''; $('#fLayer').value = '';
+      $('#fVault').value = ''; $('#fZone').value = ''; $('#fKeyword').value = '';
+      state.detail.filters = {};
+      loadDetail(1);
+    });
+    $('#detailExport').addEventListener('click', detailCsv);
+
+    $('#dayPrev').addEventListener('click', function () { loadDay(addDays(state.day.date || state.to, -1)); });
+    $('#dayNext').addEventListener('click', function () { loadDay(addDays(state.day.date || state.to, 1)); });
+    $('#dayDate').addEventListener('change', function () { loadDay(this.value); });
+
+    $('#modalClose').addEventListener('click', closeModal);
+    $('#modal').addEventListener('click', function (e) { if (e.target === $('#modal')) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+    const onResize = debounce(function () {
+      if (state.view === 'overview' && state.overview) {
+        renderTrend();
+        if (state.overview.hours) {
+          drawColumnChart($('#hourChart'), state.overview.hours.map(function (h) {
+            return { label: h.hour, value: h.events };
+          }), { color: '#8fc7e8', labelSuffix: '时' });
+        }
+        if (state.overview.weekdays) {
+          drawColumnChart($('#weekdayChart'), state.overview.weekdays.map(function (w) {
+            return { label: w.weekday, value: w.events };
+          }), { color: '#c9a8e8' });
+        }
+      }
+    }, 200);
+    window.addEventListener('resize', onResize);
+  }
+
+  // ---------- 启动 ----------
+  async function init() {
+    bindUI();
+    applyHash();
+    const ok = await loadMeta();
+    if (!ok) return;
+
+    if (state.hashRuns !== undefined) {
+      state.runs = new Set();
+      if (state.hashRuns && state.hashRuns !== '__none__') {
+        state.hashRuns.split(',').forEach(function (l) {
+          if (state.meta.runs.some(function (r) { return r.label === l; })) state.runs.add(l);
+        });
+      }
+    } else {
+      state.runs = new Set(allRunLabels());
+    }
+
+    applyDefaults();
+    fillControlSelects();
+    fillFilterSelects();
+    renderRunOptions();
+    updateRunBtn();
     renderDateList();
-    loadTimeline(date);
-  }
-
-  function loadTimeline(date) {
-    fetch(apiUrl('/api/history/timeline?date=' + encodeURIComponent(date)))
-      .then(r => r.json())
-      .then(d => {
-        timelineData = d.timeline || [];
-        renderCurrent();
-      })
-      .catch(err => {
-        timelineData = [];
-        renderCurrent();
-      });
-  }
-
-  function renderCurrent() {
-    switch (currentTab) {
-      case 'summary':  renderSummary(); break;
-      case 'items':    renderItems(); break;
-      case 'layers':   renderLayers(); break;
-      case 'timeline': renderTimeline(); break;
-    }
-  }
-
-  // ---------- 汇总 ----------
-  function renderSummary() {
-    if (!currentDate) { empty('summary'); return; }
-
-    let maps = 0, seals = 0, lootCount = 0, layerCount = 0;
-    timelineData.forEach(t => {
-      if (t.type === 'map_complete') maps++;
-      else if (t.type === 'magic_seal') seals++;
-      else if (t.type === 'loot') lootCount += t.value;
-      else if (t.type === 'layer') layerCount++;
+    renderMetaFoot();
+    syncHash();
+    switchView(state.view || 'overview', true);
+    highlightDate();
+    window.addEventListener('hashchange', function () {
+      // 外部改 hash 时同步一次（不递归）
+      const h = parseHash();
+      if (h.view && h.view !== state.view) switchView(h.view, false);
     });
-
-    let html = '<h3>📅 ' + currentDate + '</h3>';
-    html += '<div class="summary-grid">';
-    html += card('已挖地图', maps);
-    html += card('出现魔纹', seals);
-    html += card('魔纹率', maps > 0 ? (seals * 100 / maps).toFixed(1) + '%' : '0%');
-    html += card('物品总数', lootCount);
-    html += card('层级次数', layerCount);
-    html += card('事件总数', timelineData.length);
-    html += '</div>';
-
-    // 按 vault 分组
-    const vaults = {};
-    const noVault = [];
-    timelineData.forEach(t => {
-      if (t.vault_map) {
-        if (!vaults[t.vault_map]) vaults[t.vault_map] = [];
-        vaults[t.vault_map].push(t);
-      } else {
-        noVault.push(t);
-      }
-    });
-
-    if (Object.keys(vaults).length > 0) {
-      html += '<h3>🗺️ 魔纹分组</h3>';
-      Object.keys(vaults).forEach(v => {
-        html += '<div class="map-group">' + escapeHtml(v) +
-                '（' + vaults[v].length + ' 条）</div>';
-      });
-    }
-
-    document.getElementById('pane-summary').innerHTML = html;
-  }
-
-  function card(label, value) {
-    return '<div class="stat-card"><div class="label">' + label +
-           '</div><div class="value">' + value + '</div></div>';
-  }
-
-  // ---------- 物品 ----------
-  function renderItems() {
-    if (!currentDate) { empty('items'); return; }
-
-    const items = timelineData.filter(t => t.type === 'loot');
-    if (items.length === 0) { empty('items'); return; }
-
-    // 按物品名分组
-    const grouped = {};
-    const order = [];
-    items.forEach(t => {
-      const key = t.name;
-      if (!grouped[key]) { grouped[key] = 0; order.push(key); }
-      grouped[key] += t.value;
-    });
-
-    let html = '<h3>📦 ' + currentDate + ' 物品记录</h3>';
-    order.forEach(name => {
-      html += '<div class="item-row">' + escapeHtml(name) +
-              ' <span class="qty">×' + grouped[name] + '</span></div>';
-    });
-
-    document.getElementById('pane-items').innerHTML = html;
-  }
-
-  // ---------- 层级 / 其他 ----------
-  function renderLayers() {
-    if (!currentDate) { empty('layers'); return; }
-
-    const layers = timelineData.filter(t => t.type === 'layer');
-    const customs = timelineData.filter(t => t.type === 'custom');
-
-    if (layers.length === 0 && customs.length === 0) {
-      empty('layers'); return;
-    }
-
-    let html = '<h3>📋 ' + currentDate + '</h3>';
-
-    if (layers.length > 0) {
-      const grouped = {};
-      const order = [];
-      layers.forEach(t => {
-        if (!grouped[t.name]) { grouped[t.name] = 0; order.push(t.name); }
-        grouped[t.name]++;
-      });
-      html += '<div class="map-group">层级记录</div>';
-      order.forEach(name => {
-        html += '<div class="item-row">' + escapeHtml(name) +
-                ' <span class="qty">×' + grouped[name] + '</span></div>';
-      });
-    }
-
-    if (customs.length > 0) {
-      const grouped = {};
-      const order = [];
-      customs.forEach(t => {
-        if (!grouped[t.name]) { grouped[t.name] = 0; order.push(t.name); }
-        grouped[t.name] += t.value;
-      });
-      html += '<div class="map-group">其他记录</div>';
-      order.forEach(name => {
-        html += '<div class="item-row">' + escapeHtml(name) +
-                '：<span class="qty">' + grouped[name] + '</span></div>';
-      });
-    }
-
-    document.getElementById('pane-layers').innerHTML = html;
-  }
-
-  // ---------- 时间线 ----------
-  function renderTimeline() {
-    if (!currentDate || timelineData.length === 0) {
-      empty('timeline'); return;
-    }
-
-    let html = '<h3>⏱️ ' + currentDate + ' 时间线</h3>';
-    timelineData.forEach(t => {
-      const timeStr = extractTime(t.timestamp);
-      let icon = '', text = '', cls = '';
-
-      switch (t.type) {
-        case 'loot':
-          icon = '📦';
-          text = '获得 ' + escapeHtml(t.name) + ' ×' + t.value;
-          cls = 'loot';
-          break;
-        case 'layer':
-          icon = '▶';
-          text = '层级 ' + escapeHtml(t.name);
-          cls = 'layer';
-          break;
-        case 'map_complete':
-          icon = '🗺️';
-          text = '挖宝图完成';
-          cls = 'map_complete';
-          break;
-        case 'magic_seal':
-          icon = '✨';
-          text = '魔纹出现';
-          cls = 'magic_seal';
-          break;
-        case 'custom':
-          icon = '📋';
-          text = escapeHtml(t.name) + ' = ' + t.value;
-          cls = 'custom';
-          break;
-        default:
-          icon = '·';
-          text = t.type;
-      }
-
-      let vaultTag = '';
-      if (t.vault_map) {
-        vaultTag = '<span class="vault-tag">[✨' +
-                   escapeHtml(t.vault_map) + ']</span>';
-      }
-
-      html += '<div class="timeline-row ' + cls + '">' +
-              '<span class="time">' + timeStr + '</span>' +
-              '<span class="icon">' + icon + '</span>' +
-              '<span class="text">' + text + vaultTag + '</span>' +
-              '</div>';
-    });
-
-    document.getElementById('pane-timeline').innerHTML = html;
-  }
-
-  function extractTime(ts) {
-    if (!ts) return '';
-    const t = ts.indexOf('T');
-    if (t < 0) return ts;
-    return ts.substring(t + 1, t + 9);  // HH:mm:ss
-  }
-
-  function empty(paneId) {
-    document.getElementById('pane-' + paneId).innerHTML =
-      '<div class="empty">该日期无记录</div>';
-  }
-
-  function escapeHtml(s) {
-    if (!s) return '';
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
   }
 
   init();

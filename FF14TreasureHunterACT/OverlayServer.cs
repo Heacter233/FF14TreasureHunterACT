@@ -1,7 +1,9 @@
 // OverlayServer.cs
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -371,6 +373,18 @@ namespace FF14TreasureHunterACT
                     case "/api/history/layers":
                         ServeJson(ctx, BuildLayersByDateJson(ctx.Request.QueryString["date"]));
                         break;
+                    case "/api/history/meta":
+                        ServeJson(ctx, BuildHistoryMetaJson());
+                        break;
+                    case "/api/history/overview":
+                        ServeJson(ctx, BuildHistoryOverviewJson(BuildHistoryQueryDict(ctx)));
+                        break;
+                    case "/api/history/pivot":
+                        ServeJson(ctx, BuildHistoryPivotJson(BuildHistoryQueryDict(ctx)));
+                        break;
+                    case "/api/history/detail":
+                        ServeJson(ctx, BuildHistoryDetailJson(BuildHistoryQueryDict(ctx)));
+                        break;
 
                     // ---------- 配置 ----------
                     case "/api/config/all":
@@ -706,6 +720,1099 @@ namespace FF14TreasureHunterACT
             }
             return new JObject { ["date"] = date, ["records"] = arr }
                 .ToString(Formatting.None);
+        }
+
+        // ============================================================
+        // 历史分析 API（meta / overview / pivot / detail）
+        // 设计：底层只查“按日期/小时/车次/物品/层级/宝物库聚合的事实”，
+        // 上层在内存里做任意维度透视，避免为每种行列组合各写一套 SQL。
+        // ============================================================
+
+        private struct HistoryItemInfo
+        {
+            public double Price;
+            public double Bonus;
+            public string MapName;
+            public string MapDisplay;
+        }
+
+        private sealed class HistoryDayAgg
+        {
+            public int Maps;
+            public int Seals;
+            public int Layers;
+            public int Events;
+            public int Vaults;
+            public double LootQty;
+            public double LootValue;
+            public double Gold;
+        }
+
+        private sealed class HistoryMapAgg
+        {
+            public double Qty;
+            public double Value;
+            public double Maps;
+            public double Seals;
+            public double Layers;
+            public readonly HashSet<string> Runs = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        private static readonly string[] HistoryWeekdays =
+            { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+
+        private static string HistoryQuery(HttpListenerContext ctx, string key, string def = "")
+        {
+            try
+            {
+                string v = ctx.Request.QueryString[key];
+                return string.IsNullOrEmpty(v) ? def : v.Trim();
+            }
+            catch { return def; }
+        }
+
+        private static Dictionary<string, string> BuildHistoryQueryDict(HttpListenerContext ctx)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (string key in ctx.Request.QueryString.AllKeys)
+                {
+                    if (string.IsNullOrEmpty(key)) continue;
+                    dict[key] = ctx.Request.QueryString[key];
+                }
+            }
+            catch { }
+            return dict;
+        }
+
+        private static string HistoryQ(Dictionary<string, string> q, string key, string def = "")
+        {
+            string v;
+            if (q != null && q.TryGetValue(key, out v) && !string.IsNullOrEmpty(v))
+                return v.Trim();
+            return def;
+        }
+
+        private static List<string> SplitHistoryList(string raw)
+        {
+            var list = new List<string>();
+            if (string.IsNullOrEmpty(raw)) return list;
+            foreach (var part in raw.Split(','))
+            {
+                string s = part.Trim();
+                if (!string.IsNullOrEmpty(s) && !list.Contains(s)) list.Add(s);
+            }
+            return list;
+        }
+
+        private static DateTime? ParseHistoryDate(string s)
+        {
+            DateTime d;
+            if (DateTime.TryParseExact(s ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                                       DateTimeStyles.None, out d))
+                return d;
+            return null;
+        }
+
+        private static string MondayOf(string date)
+        {
+            var d = ParseHistoryDate(date);
+            if (!d.HasValue) return date ?? "";
+            int offset = ((int)d.Value.DayOfWeek + 6) % 7;   // 周一 = 0
+            return d.Value.AddDays(-offset).ToString("yyyy-MM-dd");
+        }
+
+        private static int HistoryWeekdayIndex(string date)
+        {
+            var d = ParseHistoryDate(date);
+            if (!d.HasValue) return -1;
+            return ((int)d.Value.DayOfWeek + 6) % 7;
+        }
+
+        private static double HistorySecondsBetween(string a, string b)
+        {
+            DateTime da, db;
+            if (!DateTime.TryParse(a ?? "", CultureInfo.InvariantCulture, DateTimeStyles.None, out da))
+                return 0;
+            if (!DateTime.TryParse(b ?? "", CultureInfo.InvariantCulture, DateTimeStyles.None, out db))
+                return 0;
+            double sec = (db - da).TotalSeconds;
+            return sec > 0 ? sec : 0;
+        }
+
+        private void NormalizeHistoryRange(ref string from, ref string to)
+        {
+            var dates = _db != null ? _db.GetAvailableDates() : new List<string>();
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to))
+            {
+                if (dates.Count > 0)
+                {
+                    if (string.IsNullOrEmpty(to)) to = dates[0];
+                    if (string.IsNullOrEmpty(from)) from = dates[dates.Count - 1];
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(from)) from = today;
+                    if (string.IsNullOrEmpty(to)) to = today;
+                }
+            }
+            if (!ParseHistoryDate(from).HasValue) from = today;
+            if (!ParseHistoryDate(to).HasValue) to = today;
+            if (string.CompareOrdinal(from, to) > 0)
+            {
+                string tmp = from; from = to; to = tmp;
+            }
+        }
+
+        private Dictionary<string, HistoryItemInfo> BuildHistoryPriceMap()
+        {
+            var dict = new Dictionary<string, HistoryItemInfo>(StringComparer.Ordinal);
+            if (_mapConfig == null) return dict;
+            foreach (var mc in _mapConfig.Maps.Values)
+            {
+                foreach (var it in mc.Items)
+                {
+                    if (string.IsNullOrEmpty(it.Name)) continue;
+                    HistoryItemInfo exist;
+                    bool known = dict.TryGetValue(it.Name, out exist);
+                    if (known && !mc.Enabled) continue;      // 已启用地图优先
+                    dict[it.Name] = new HistoryItemInfo
+                    {
+                        Price = it.Price,
+                        Bonus = it.Bonus,
+                        MapName = mc.Name,
+                        MapDisplay = mc.MapName
+                    };
+                }
+            }
+            return dict;
+        }
+
+        /// <summary>把一次运行归到唯一地图类型（用于给地图完成/魔纹等无物品事件归类）。</summary>
+        private static Dictionary<string, string> BuildHistoryRunMap(
+            Dictionary<string, HistoryItemInfo> prices, List<HistoryFact> facts)
+        {
+            var sets = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (var f in facts)
+            {
+                if (f.Type != "loot") continue;
+                HistoryItemInfo info;
+                if (!prices.TryGetValue(f.ItemName, out info) || string.IsNullOrEmpty(info.MapName))
+                    continue;
+                HashSet<string> set;
+                if (!sets.TryGetValue(f.RunLabel, out set))
+                {
+                    set = new HashSet<string>(StringComparer.Ordinal);
+                    sets[f.RunLabel] = set;
+                }
+                set.Add(info.MapName);
+            }
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var kv in sets)
+                result[kv.Key] = kv.Value.Count == 1 ? kv.Value.First() : "混合";
+            return result;
+        }
+
+        private static string NormalizeHistoryDim(string dim)
+        {
+            switch ((dim ?? "").ToLowerInvariant())
+            {
+                case "date":
+                case "week":
+                case "month":
+                case "run":
+                case "item":
+                case "map":
+                case "layer":
+                case "hour":
+                case "weekday":
+                case "vault":
+                case "zone":
+                case "custom":
+                    return dim.ToLowerInvariant();
+                default:
+                    return "date";
+            }
+        }
+
+        private static string NormalizeHistoryMeasure(string m)
+        {
+            switch ((m ?? "").ToLowerInvariant())
+            {
+                case "qty":
+                case "value":
+                case "events":
+                case "maps":
+                case "seals":
+                case "layers":
+                case "gold":
+                case "custom":
+                case "loot_rows":
+                    return m.ToLowerInvariant();
+                default:
+                    return "qty";
+            }
+        }
+
+        private static string HistoryDimKey(HistoryFact f, string dim,
+            Dictionary<string, HistoryItemInfo> prices, Dictionary<string, string> runMap)
+        {
+            switch (dim)
+            {
+                case "date": return f.Date;
+                case "week": return MondayOf(f.Date);
+                case "month":
+                    return string.IsNullOrEmpty(f.Date) ? "" :
+                        f.Date.Substring(0, Math.Min(7, f.Date.Length));
+                case "run": return f.RunLabel;
+                case "item": return f.Type == "loot" ? f.ItemName : "";
+                case "layer": return f.Type == "layer" ? f.LayerName : "";
+                case "hour": return f.Hour;
+                case "weekday":
+                    {
+                        int idx = HistoryWeekdayIndex(f.Date);
+                        return idx >= 0 ? HistoryWeekdays[idx] : "";
+                    }
+                case "vault": return f.VaultMap;
+                case "zone": return f.Zone;
+                case "custom": return f.Type == "custom" ? f.CustomName : "";
+                case "map":
+                    {
+                        if (f.Type == "loot")
+                        {
+                            HistoryItemInfo info;
+                            if (!string.IsNullOrEmpty(f.ItemName) &&
+                                prices.TryGetValue(f.ItemName, out info) &&
+                                !string.IsNullOrEmpty(info.MapName))
+                                return info.MapName;
+                            return "未知";
+                        }
+                        string mapped;
+                        if (runMap.TryGetValue(f.RunLabel, out mapped)) return mapped;
+                        return "未标注";
+                    }
+                default: return f.Date;
+            }
+        }
+
+        private static string HistoryDimLabel(string dim)
+        {
+            switch (dim)
+            {
+                case "date": return "日期";
+                case "week": return "周";
+                case "month": return "月份";
+                case "run": return "车次";
+                case "item": return "物品";
+                case "map": return "地图类型";
+                case "layer": return "层级";
+                case "hour": return "小时";
+                case "weekday": return "星期";
+                case "vault": return "宝物库";
+                case "zone": return "区域";
+                case "custom": return "其他记录";
+                default: return dim;
+            }
+        }
+
+        private static string HistoryMeasureLabel(string m)
+        {
+            switch (m)
+            {
+                case "qty": return "物品数量";
+                case "value": return "物品价值";
+                case "events": return "事件数";
+                case "maps": return "地图完成数";
+                case "seals": return "魔纹数";
+                case "layers": return "层级次数";
+                case "gold": return "系统金";
+                case "custom": return "其他记录值";
+                case "loot_rows": return "出货次数";
+                default: return m;
+            }
+        }
+
+        private static double HistoryMeasureValue(HistoryFact f, string measure,
+            Dictionary<string, HistoryItemInfo> prices)
+        {
+            switch (measure)
+            {
+                case "qty": return f.Type == "loot" ? f.Quantity : 0;
+                case "value":
+                    {
+                        if (f.Type != "loot") return 0;
+                        HistoryItemInfo info;
+                        return prices.TryGetValue(f.ItemName, out info)
+                            ? f.Quantity * info.Price : 0;
+                    }
+                case "events": return f.Records;
+                case "maps": return f.Type == "map_complete" ? f.Quantity : 0;
+                case "seals": return f.Type == "magic_seal" ? f.Quantity : 0;
+                case "layers": return f.Type == "layer" ? f.Quantity : 0;
+                case "gold": return f.Type == "system_gold" ? f.Quantity : 0;
+                case "custom": return f.Type == "custom" ? f.Quantity : 0;
+                case "loot_rows": return f.Type == "loot" ? f.Records : 0;
+                default: return 0;
+            }
+        }
+
+        private static List<string> OrderHistoryDimKeys(
+            IEnumerable<string> keys, string dim, Dictionary<string, double> totals)
+        {
+            if (dim == "weekday")
+            {
+                return keys.OrderBy(k =>
+                {
+                    int i = Array.IndexOf(HistoryWeekdays, k);
+                    return i < 0 ? 99 : i;
+                }).ToList();
+            }
+            if (dim == "hour" || dim == "date" || dim == "week" || dim == "month")
+                return keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
+            if (dim == "run")
+                return keys.OrderByDescending(k => k, StringComparer.Ordinal).ToList();
+            return keys
+                .OrderByDescending(k =>
+                {
+                    double v;
+                    return totals.TryGetValue(k, out v) ? v : 0;
+                })
+                .ThenBy(k => k, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        // ---------- meta ----------
+        private string BuildHistoryMetaJson()
+        {
+            if (_db == null) return "{}";
+            var dates = _db.GetAvailableDates();
+            string from = dates.Count > 0 ? dates[dates.Count - 1] : DateTime.Now.ToString("yyyy-MM-dd");
+            string to = dates.Count > 0 ? dates[0] : from;
+
+            var itemsArr = new JArray();
+            var seenItems = new HashSet<string>(StringComparer.Ordinal);
+            var mapsArr = new JArray();
+            if (_mapConfig != null)
+            {
+                foreach (var mc in _mapConfig.Maps.Values)
+                {
+                    var itemNames = new JArray();
+                    foreach (var it in mc.Items)
+                    {
+                        if (string.IsNullOrEmpty(it.Name)) continue;
+                        itemNames.Add(it.Name);
+                        if (!seenItems.Add(it.Name)) continue;
+                        itemsArr.Add(new JObject
+                        {
+                            ["name"] = it.Name,
+                            ["price"] = it.Price,
+                            ["bonus"] = it.Bonus,
+                            ["map"] = mc.Name,
+                            ["map_name"] = mc.MapName
+                        });
+                    }
+                    mapsArr.Add(new JObject
+                    {
+                        ["name"] = mc.Name,
+                        ["map_name"] = mc.MapName,
+                        ["prefix"] = mc.MapItemPrefix,
+                        ["enabled"] = mc.Enabled,
+                        ["items"] = itemNames
+                    });
+                }
+            }
+            foreach (var name in _db.GetDistinctLootItems())
+            {
+                if (!seenItems.Add(name)) continue;
+                itemsArr.Add(new JObject
+                {
+                    ["name"] = name, ["price"] = 0, ["bonus"] = 0,
+                    ["map"] = "", ["map_name"] = ""
+                });
+            }
+
+            var layerSeen = new HashSet<string>(StringComparer.Ordinal);
+            var layersArr = new JArray();
+            if (_mapConfig != null)
+            {
+                foreach (var mc in _mapConfig.Maps.Values)
+                    foreach (var ly in mc.Layers)
+                    {
+                        string label = string.IsNullOrEmpty(ly.Nickname) ? ly.Keyword : ly.Nickname;
+                        if (!string.IsNullOrEmpty(label) && layerSeen.Add(label))
+                            layersArr.Add(label);
+                    }
+            }
+            foreach (var name in _db.GetDistinctLayerNames())
+                if (layerSeen.Add(name)) layersArr.Add(name);
+
+            var runsArr = new JArray();
+            foreach (var r in _db.GetHistoryRuns(from, to))
+            {
+                runsArr.Add(new JObject
+                {
+                    ["label"] = r.Label,
+                    ["date"] = r.FirstTs.Length >= 10 ? r.FirstTs.Substring(0, 10) : "",
+                    ["first_ts"] = r.FirstTs,
+                    ["last_ts"] = r.LastTs,
+                    ["maps"] = r.Maps,
+                    ["seals"] = r.Seals,
+                    ["gold"] = r.Gold,
+                    ["events"] = r.Events,
+                    ["cost"] = r.Cost,
+                    ["elapsed"] = r.Elapsed,
+                    ["has_summary"] = r.HasSummary
+                });
+            }
+
+            var datesArr = new JArray();
+            foreach (var d in dates) datesArr.Add(d);
+
+            return new JObject
+            {
+                ["dates"] = datesArr,
+                ["bounds"] = new JObject { ["from"] = from, ["to"] = to },
+                ["runs"] = runsArr,
+                ["items"] = itemsArr,
+                ["layers"] = layersArr,
+                ["maps"] = mapsArr,
+                ["money_unit_wan"] = ConfigManager.MoneyUnitWan,
+                ["price_source"] = "maps.json"
+            }.ToString(Formatting.None);
+        }
+
+        // ---------- pivot ----------
+        private string BuildHistoryPivotJson(Dictionary<string, string> q)
+        {
+            if (_db == null) return "{}";
+            string from = HistoryQ(q, "from");
+            string to = HistoryQ(q, "to");
+            NormalizeHistoryRange(ref from, ref to);
+            var runLabels = SplitHistoryList(HistoryQ(q, "runs"));
+            string row = NormalizeHistoryDim(HistoryQ(q, "row", "item"));
+            string col = NormalizeHistoryDim(HistoryQ(q, "col", "date"));
+            string measure = NormalizeHistoryMeasure(HistoryQ(q, "measure", "qty"));
+
+            var facts = _db.GetHistoryFacts(from, to, runLabels);
+            var prices = BuildHistoryPriceMap();
+            var runMap = BuildHistoryRunMap(prices, facts);
+
+            var rowTotals = new Dictionary<string, double>(StringComparer.Ordinal);
+            var colTotals = new Dictionary<string, double>(StringComparer.Ordinal);
+            var cellValues = new Dictionary<string, double>(StringComparer.Ordinal);
+            double grand = 0;
+
+            foreach (var f in facts)
+            {
+                string rk = HistoryDimKey(f, row, prices, runMap);
+                string ck = HistoryDimKey(f, col, prices, runMap);
+                if (string.IsNullOrEmpty(rk) || string.IsNullOrEmpty(ck)) continue;
+                double v = HistoryMeasureValue(f, measure, prices);
+                if (Math.Abs(v) < 1e-9) continue;
+
+                double cur;
+                string key = rk + "\u0001" + ck;
+                cellValues.TryGetValue(key, out cur);
+                cellValues[key] = cur + v;
+
+                rowTotals.TryGetValue(rk, out cur);
+                rowTotals[rk] = cur + v;
+                colTotals.TryGetValue(ck, out cur);
+                colTotals[ck] = cur + v;
+                grand += v;
+            }
+
+            var rows = OrderHistoryDimKeys(rowTotals.Keys, row, rowTotals);
+            var cols = OrderHistoryDimKeys(colTotals.Keys, col, colTotals);
+            const int cap = 500;
+            bool truncated = rows.Count > cap || cols.Count > cap;
+            if (rows.Count > cap) rows = rows.Take(cap).ToList();
+            if (cols.Count > cap) cols = cols.Take(cap).ToList();
+
+            var rIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < rows.Count; i++) rIndex[rows[i]] = i;
+            var cIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < cols.Count; i++) cIndex[cols[i]] = i;
+
+            var cells = new JArray();
+            foreach (var kv in cellValues)
+            {
+                string[] parts = kv.Key.Split('\u0001');
+                if (parts.Length != 2) continue;
+                int ri, ci;
+                if (!rIndex.TryGetValue(parts[0], out ri)) continue;
+                if (!cIndex.TryGetValue(parts[1], out ci)) continue;
+                cells.Add(new JObject { ["r"] = ri, ["c"] = ci, ["v"] = kv.Value });
+            }
+
+            var rowsArr = new JArray();
+            var rowTotalsArr = new JArray();
+            foreach (var k in rows)
+            {
+                rowsArr.Add(k);
+                double v;
+                rowTotals.TryGetValue(k, out v);
+                rowTotalsArr.Add(v);
+            }
+            var colsArr = new JArray();
+            var colTotalsArr = new JArray();
+            foreach (var k in cols)
+            {
+                colsArr.Add(k);
+                double v;
+                colTotals.TryGetValue(k, out v);
+                colTotalsArr.Add(v);
+            }
+
+            return new JObject
+            {
+                ["from"] = from,
+                ["to"] = to,
+                ["row"] = row,
+                ["col"] = col,
+                ["measure"] = measure,
+                ["row_label"] = HistoryDimLabel(row),
+                ["col_label"] = HistoryDimLabel(col),
+                ["measure_label"] = HistoryMeasureLabel(measure),
+                ["rows"] = rowsArr,
+                ["cols"] = colsArr,
+                ["cells"] = cells,
+                ["row_totals"] = rowTotalsArr,
+                ["col_totals"] = colTotalsArr,
+                ["grand"] = grand,
+                ["truncated"] = truncated
+            }.ToString(Formatting.None);
+        }
+
+        // ---------- detail ----------
+        private string BuildHistoryDetailJson(Dictionary<string, string> q)
+        {
+            if (_db == null) return "{}";
+            string from = HistoryQ(q, "from");
+            string to = HistoryQ(q, "to");
+            NormalizeHistoryRange(ref from, ref to);
+            var runLabels = SplitHistoryList(HistoryQ(q, "runs"));
+            string type = HistoryQ(q, "type");
+            var items = SplitHistoryList(HistoryQ(q, "items"));
+            string layer = HistoryQ(q, "layer");
+            string vault = HistoryQ(q, "vault");
+            string hour = HistoryQ(q, "hour");
+            string weekday = HistoryQ(q, "weekday");
+            string zone = HistoryQ(q, "zone");
+            string custom = HistoryQ(q, "custom");
+            string keyword = HistoryQ(q, "q");
+
+            int page = 1, size = 100;
+            int.TryParse(HistoryQ(q, "page", "1"), out page);
+            int.TryParse(HistoryQ(q, "size", "100"), out size);
+            if (page < 1) page = 1;
+            if (size < 1) size = 100;
+            if (size > 5000) size = 5000;
+
+            int total;
+            var rows = _db.GetHistoryDetail(from, to, runLabels, type, items, layer,
+                vault, hour, weekday, zone, custom, keyword, page, size, out total);
+            var prices = BuildHistoryPriceMap();
+
+            var arr = new JArray();
+            foreach (var r in rows)
+            {
+                double price = 0, value = 0;
+                HistoryItemInfo info;
+                if (r.Type == "loot" && prices.TryGetValue(r.Name, out info))
+                {
+                    price = info.Price;
+                    value = r.Qty * info.Price;
+                }
+                string date = r.Ts.Length >= 10 ? r.Ts.Substring(0, 10) : r.Ts;
+                string time = r.Ts.Length >= 19 ? r.Ts.Substring(11, 8) : "";
+                arr.Add(new JObject
+                {
+                    ["ts"] = r.Ts,
+                    ["date"] = date,
+                    ["time"] = time,
+                    ["run"] = r.RunLabel,
+                    ["type"] = r.Type,
+                    ["name"] = r.Name,
+                    ["qty"] = r.Qty,
+                    ["gold"] = r.Gold,
+                    ["price"] = price,
+                    ["value"] = value,
+                    ["vault"] = r.Vault,
+                    ["zone"] = r.Zone
+                });
+            }
+
+            return new JObject
+            {
+                ["from"] = from,
+                ["to"] = to,
+                ["page"] = page,
+                ["size"] = size,
+                ["total"] = total,
+                ["rows"] = arr
+            }.ToString(Formatting.None);
+        }
+
+        // ---------- overview ----------
+        private string BuildHistoryOverviewJson(Dictionary<string, string> q)
+        {
+            if (_db == null) return "{}";
+            string from = HistoryQ(q, "from");
+            string to = HistoryQ(q, "to");
+            NormalizeHistoryRange(ref from, ref to);
+            var runLabels = SplitHistoryList(HistoryQ(q, "runs"));
+
+            var facts = _db.GetHistoryFacts(from, to, runLabels);
+            var prices = BuildHistoryPriceMap();
+            var runMap = BuildHistoryRunMap(prices, facts);
+
+            var runRows = _db.GetHistoryRuns(from, to);
+            if (runLabels.Count > 0)
+            {
+                var set = new HashSet<string>(runLabels, StringComparer.Ordinal);
+                runRows = runRows.Where(r => set.Contains(r.Label)).ToList();
+            }
+
+            var vaults = _db.GetHistoryVaults(from, to);
+            if (runLabels.Count > 0)
+            {
+                var windows = runRows.Select(r => new { r.FirstTs, r.LastTs }).ToList();
+                vaults = vaults.Where(v =>
+                    windows.Any(w =>
+                        string.CompareOrdinal(v.StartTime, w.FirstTs) >= 0 &&
+                        string.CompareOrdinal(v.StartTime, w.LastTs) <= 0)).ToList();
+            }
+
+            int maps = 0, seals = 0, layersCount = 0, events = 0;
+            double lootQty = 0, lootValue = 0, gold = 0;
+            var daily = new Dictionary<string, HistoryDayAgg>(StringComparer.Ordinal);
+            var itemQty = new Dictionary<string, double>(StringComparer.Ordinal);
+            var itemValue = new Dictionary<string, double>(StringComparer.Ordinal);
+            var layerAgg = new Dictionary<string, double>(StringComparer.Ordinal);
+            var mapAgg = new Dictionary<string, HistoryMapAgg>(StringComparer.Ordinal);
+            var hourEvents = new int[24];
+            var hourLoot = new double[24];
+            var hourValue = new double[24];
+            var weekdayEvents = new int[7];
+            var weekdayLoot = new double[7];
+            var weekdayValue = new double[7];
+
+            var runLootQty = new Dictionary<string, double>(StringComparer.Ordinal);
+            var runLootValue = new Dictionary<string, double>(StringComparer.Ordinal);
+            var runMapsDate = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+            var runFirstDate = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var f in facts)
+            {
+                HistoryDayAgg day;
+                if (!daily.TryGetValue(f.Date, out day))
+                {
+                    day = new HistoryDayAgg();
+                    daily[f.Date] = day;
+                }
+                day.Events += f.Records;
+                events += f.Records;
+
+                string first;
+                if (!runFirstDate.TryGetValue(f.RunLabel, out first) ||
+                    string.CompareOrdinal(f.Date, first) < 0)
+                    runFirstDate[f.RunLabel] = f.Date;
+
+                int wd = HistoryWeekdayIndex(f.Date);
+                int hh = 0;
+                int.TryParse(f.Hour, out hh);
+                if (hh < 0 || hh > 23) hh = 0;
+
+                switch (f.Type)
+                {
+                    case "loot":
+                        {
+                            lootQty += f.Quantity;
+                            day.LootQty += f.Quantity;
+                            itemQty.TryGetValue(f.ItemName, out var iq);
+                            itemQty[f.ItemName] = iq + f.Quantity;
+
+                            double val = 0;
+                            HistoryItemInfo info;
+                            if (prices.TryGetValue(f.ItemName, out info))
+                            {
+                                val = f.Quantity * info.Price;
+                                string mn = string.IsNullOrEmpty(info.MapName) ? "未知" : info.MapName;
+                                HistoryMapAgg ma;
+                                if (!mapAgg.TryGetValue(mn, out ma))
+                                {
+                                    ma = new HistoryMapAgg();
+                                    mapAgg[mn] = ma;
+                                }
+                                ma.Qty += f.Quantity;
+                                ma.Value += val;
+                                ma.Runs.Add(f.RunLabel);
+                            }
+                            lootValue += val;
+                            day.LootValue += val;
+                            itemValue.TryGetValue(f.ItemName, out var iv);
+                            itemValue[f.ItemName] = iv + val;
+                            runLootQty.TryGetValue(f.RunLabel, out var rq);
+                            runLootQty[f.RunLabel] = rq + f.Quantity;
+                            runLootValue.TryGetValue(f.RunLabel, out var rv);
+                            runLootValue[f.RunLabel] = rv + val;
+
+                            if (wd >= 0 && wd < 7)
+                            {
+                                weekdayEvents[wd] += f.Records;
+                                weekdayLoot[wd] += f.Quantity;
+                                weekdayValue[wd] += val;
+                            }
+                            hourEvents[hh] += f.Records;
+                            hourLoot[hh] += f.Quantity;
+                            hourValue[hh] += val;
+                        }
+                        break;
+
+                    case "layer":
+                        layersCount += (int)f.Quantity;
+                        day.Layers += (int)f.Quantity;
+                        layerAgg.TryGetValue(f.LayerName, out var lc);
+                        layerAgg[f.LayerName] = lc + f.Quantity;
+
+                        string layerMap = null;
+                        if (_mapConfig != null && !string.IsNullOrEmpty(f.LayerName))
+                        {
+                            var match = _mapConfig.GetLayerByKeyword(f.LayerName);
+                            if (match.Item1 != null) layerMap = match.Item1.Name;
+                        }
+                        if (string.IsNullOrEmpty(layerMap) && runMap.ContainsKey(f.RunLabel))
+                            layerMap = runMap[f.RunLabel];
+                        if (!string.IsNullOrEmpty(layerMap))
+                        {
+                            HistoryMapAgg ma;
+                            if (!mapAgg.TryGetValue(layerMap, out ma))
+                            {
+                                ma = new HistoryMapAgg();
+                                mapAgg[layerMap] = ma;
+                            }
+                            ma.Layers += f.Quantity;
+                            ma.Runs.Add(f.RunLabel);
+                        }
+                        if (wd >= 0 && wd < 7) weekdayEvents[wd] += f.Records;
+                        hourEvents[hh] += f.Records;
+                        break;
+
+                    case "map_complete":
+                        maps += (int)f.Quantity;
+                        day.Maps += (int)f.Quantity;
+                        {
+                            Dictionary<string, int> perDate;
+                            if (!runMapsDate.TryGetValue(f.RunLabel, out perDate))
+                            {
+                                perDate = new Dictionary<string, int>(StringComparer.Ordinal);
+                                runMapsDate[f.RunLabel] = perDate;
+                            }
+                            perDate.TryGetValue(f.Date, out var mc);
+                            perDate[f.Date] = mc + (int)f.Quantity;
+                        }
+                        {
+                            string mn;
+                            if (!runMap.TryGetValue(f.RunLabel, out mn)) mn = "未标注";
+                            HistoryMapAgg ma;
+                            if (!mapAgg.TryGetValue(mn, out ma))
+                            {
+                                ma = new HistoryMapAgg();
+                                mapAgg[mn] = ma;
+                            }
+                            ma.Maps += f.Quantity;
+                            ma.Runs.Add(f.RunLabel);
+                        }
+                        if (wd >= 0 && wd < 7) weekdayEvents[wd] += f.Records;
+                        hourEvents[hh] += f.Records;
+                        break;
+
+                    case "magic_seal":
+                        seals += (int)f.Quantity;
+                        day.Seals += (int)f.Quantity;
+                        {
+                            string mn;
+                            if (!runMap.TryGetValue(f.RunLabel, out mn)) mn = "未标注";
+                            HistoryMapAgg ma;
+                            if (!mapAgg.TryGetValue(mn, out ma))
+                            {
+                                ma = new HistoryMapAgg();
+                                mapAgg[mn] = ma;
+                            }
+                            ma.Seals += f.Quantity;
+                            ma.Runs.Add(f.RunLabel);
+                        }
+                        if (wd >= 0 && wd < 7) weekdayEvents[wd] += f.Records;
+                        hourEvents[hh] += f.Records;
+                        break;
+
+                    case "system_gold":
+                        gold += f.Quantity;
+                        day.Gold += f.Quantity;
+                        if (wd >= 0 && wd < 7) weekdayEvents[wd] += f.Records;
+                        hourEvents[hh] += f.Records;
+                        break;
+                }
+            }
+
+            // 宝物库按开始日期计入当天
+            foreach (var v in vaults)
+            {
+                string vd = v.StartTime.Length >= 10 ? v.StartTime.Substring(0, 10) : "";
+                HistoryDayAgg day;
+                if (!string.IsNullOrEmpty(vd) && daily.TryGetValue(vd, out day))
+                    day.Vaults++;
+            }
+
+            // 日成本：按每车地图数分摊（无地图的整车成本记到首日）
+            var dateCost = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (var r in runRows)
+            {
+                Dictionary<string, int> perDate;
+                if (!runMapsDate.TryGetValue(r.Label, out perDate))
+                    perDate = new Dictionary<string, int>(StringComparer.Ordinal);
+                int totalMaps = perDate.Values.Sum();
+                if (totalMaps > 0 && Math.Abs(r.Cost) > 1e-9)
+                {
+                    foreach (var kv in perDate)
+                    {
+                        double add = r.Cost * kv.Value / totalMaps;
+                        dateCost.TryGetValue(kv.Key, out var cur);
+                        dateCost[kv.Key] = cur + add;
+                    }
+                }
+                else if (Math.Abs(r.Cost) > 1e-9)
+                {
+                    string first = runFirstDate.ContainsKey(r.Label)
+                        ? runFirstDate[r.Label]
+                        : (r.FirstTs.Length >= 10 ? r.FirstTs.Substring(0, 10) : from);
+                    dateCost.TryGetValue(first, out var cur);
+                    dateCost[first] = cur + r.Cost;
+                }
+            }
+
+            // 连续日期序列（范围过大时只列有数据的日期）
+            var dateList = new List<string>();
+            var d0 = ParseHistoryDate(from);
+            var d1 = ParseHistoryDate(to);
+            if (d0.HasValue && d1.HasValue && (d1.Value - d0.Value).TotalDays <= 400)
+            {
+                for (var d = d0.Value; d <= d1.Value; d = d.AddDays(1))
+                    dateList.Add(d.ToString("yyyy-MM-dd"));
+            }
+            else
+            {
+                dateList = daily.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
+            }
+
+            var dailyArr = new JArray();
+            foreach (var date in dateList)
+            {
+                HistoryDayAgg day;
+                if (!daily.TryGetValue(date, out day))
+                    day = new HistoryDayAgg();
+                double cost;
+                dateCost.TryGetValue(date, out cost);
+                double income = day.LootValue + day.Gold;
+                dailyArr.Add(new JObject
+                {
+                    ["date"] = date,
+                    ["maps"] = day.Maps,
+                    ["seals"] = day.Seals,
+                    ["loot_qty"] = day.LootQty,
+                    ["loot_value"] = day.LootValue,
+                    ["gold"] = day.Gold,
+                    ["income"] = income,
+                    ["cost"] = cost,
+                    ["profit"] = income - cost,
+                    ["layers"] = day.Layers,
+                    ["events"] = day.Events,
+                    ["vaults"] = day.Vaults
+                });
+            }
+
+            var runsArr = new JArray();
+            foreach (var r in runRows)
+            {
+                double rq, rv;
+                runLootQty.TryGetValue(r.Label, out rq);
+                runLootValue.TryGetValue(r.Label, out rv);
+                double income = rv + r.Gold;
+                int vaultCount = 0;
+                foreach (var v in vaults)
+                {
+                    if (string.CompareOrdinal(v.StartTime, r.FirstTs) >= 0 &&
+                        string.CompareOrdinal(v.StartTime, r.LastTs) <= 0)
+                        vaultCount++;
+                }
+                runsArr.Add(new JObject
+                {
+                    ["label"] = r.Label,
+                    ["date"] = r.FirstTs.Length >= 10 ? r.FirstTs.Substring(0, 10) : "",
+                    ["first_ts"] = r.FirstTs,
+                    ["last_ts"] = r.LastTs,
+                    ["maps"] = r.Maps,
+                    ["seals"] = r.Seals,
+                    ["seal_rate"] = r.Maps > 0 ? 100.0 * r.Seals / r.Maps : 0,
+                    ["loot_qty"] = rq,
+                    ["loot_value"] = rv,
+                    ["gold"] = r.Gold,
+                    ["income"] = income,
+                    ["cost"] = r.Cost,
+                    ["profit"] = income - r.Cost,
+                    ["elapsed"] = r.Elapsed,
+                    ["events"] = r.Events,
+                    ["vaults"] = vaultCount,
+                    ["has_summary"] = r.HasSummary
+                });
+            }
+
+            var itemsArr = new JArray();
+            foreach (var name in itemQty.Keys
+                .OrderByDescending(k => { double v; return itemValue.TryGetValue(k, out v) ? v : 0; })
+                .ThenByDescending(k => { double v; return itemQty.TryGetValue(k, out v) ? v : 0; }))
+            {
+                double qty, val;
+                itemQty.TryGetValue(name, out qty);
+                itemValue.TryGetValue(name, out val);
+                HistoryItemInfo info;
+                bool known = prices.TryGetValue(name, out info);
+                itemsArr.Add(new JObject
+                {
+                    ["name"] = name,
+                    ["qty"] = qty,
+                    ["value"] = val,
+                    ["price"] = known ? info.Price : 0,
+                    ["bonus"] = known ? info.Bonus : 0,
+                    ["map"] = known ? info.MapName : "",
+                    ["map_name"] = known ? info.MapDisplay : ""
+                });
+            }
+
+            var layersArr = new JArray();
+            foreach (var name in layerAgg.Keys
+                .OrderByDescending(k => { double v; return layerAgg.TryGetValue(k, out v) ? v : 0; })
+                .ThenBy(k => k, StringComparer.Ordinal))
+            {
+                double c;
+                layerAgg.TryGetValue(name, out c);
+                layersArr.Add(new JObject { ["name"] = name, ["count"] = c });
+            }
+
+            var mapTypesArr = new JArray();
+            foreach (var name in mapAgg.Keys
+                .OrderByDescending(k => mapAgg[k].Value)
+                .ThenByDescending(k => mapAgg[k].Qty))
+            {
+                var ma = mapAgg[name];
+                mapTypesArr.Add(new JObject
+                {
+                    ["name"] = name,
+                    ["qty"] = ma.Qty,
+                    ["value"] = ma.Value,
+                    ["maps"] = ma.Maps,
+                    ["seals"] = ma.Seals,
+                    ["layers"] = ma.Layers,
+                    ["runs"] = ma.Runs.Count
+                });
+            }
+
+            var hoursArr = new JArray();
+            for (int h = 0; h < 24; h++)
+            {
+                hoursArr.Add(new JObject
+                {
+                    ["hour"] = h.ToString("00"),
+                    ["events"] = hourEvents[h],
+                    ["loot_qty"] = hourLoot[h],
+                    ["value"] = hourValue[h]
+                });
+            }
+
+            var weekdaysArr = new JArray();
+            for (int w = 0; w < 7; w++)
+            {
+                weekdaysArr.Add(new JObject
+                {
+                    ["weekday"] = HistoryWeekdays[w],
+                    ["events"] = weekdayEvents[w],
+                    ["loot_qty"] = weekdayLoot[w],
+                    ["value"] = weekdayValue[w]
+                });
+            }
+
+            double vaultSeconds = 0;
+            int vaultLoot = 0, vaultLayers = 0;
+            foreach (var v in vaults)
+            {
+                vaultSeconds += HistorySecondsBetween(v.StartTime, v.LastTs);
+                vaultLoot += v.LootQty;
+                vaultLayers += v.LayerCount;
+            }
+
+            double totalCost = runRows.Sum(r => r.Cost);
+            double totalIncome = lootValue + gold;
+            int activeDays = daily.Values.Count(d => d.Events > 0);
+
+            return new JObject
+            {
+                ["from"] = from,
+                ["to"] = to,
+                ["runs_selected"] = new JArray(runLabels),
+                ["totals"] = new JObject
+                {
+                    ["maps"] = maps,
+                    ["magic_seals"] = seals,
+                    ["seal_rate"] = maps > 0 ? 100.0 * seals / maps : 0,
+                    ["loot_qty"] = lootQty,
+                    ["loot_value"] = lootValue,
+                    ["gold"] = gold,
+                    ["income"] = totalIncome,
+                    ["cost"] = totalCost,
+                    ["profit"] = totalIncome - totalCost,
+                    ["layers"] = layersCount,
+                    ["events"] = events,
+                    ["runs"] = runRows.Count,
+                    ["days"] = dateList.Count,
+                    ["active_days"] = activeDays,
+                    ["vaults"] = vaults.Count,
+                    ["vault_seconds"] = vaultSeconds,
+                    ["vault_loot"] = vaultLoot,
+                    ["vault_layers"] = vaultLayers,
+                    ["per_map_loot"] = maps > 0 ? lootQty / maps : 0,
+                    ["per_map_value"] = maps > 0 ? lootValue / maps : 0,
+                    ["per_map_income"] = maps > 0 ? totalIncome / maps : 0,
+                    ["per_run_profit"] = runRows.Count > 0 ? (totalIncome - totalCost) / runRows.Count : 0
+                },
+                ["daily"] = dailyArr,
+                ["runs"] = runsArr,
+                ["items"] = itemsArr,
+                ["layers"] = layersArr,
+                ["map_types"] = mapTypesArr,
+                ["hours"] = hoursArr,
+                ["weekdays"] = weekdaysArr,
+                ["vaults"] = new JObject
+                {
+                    ["count"] = vaults.Count,
+                    ["seconds"] = vaultSeconds,
+                    ["loot_qty"] = vaultLoot,
+                    ["layers"] = vaultLayers,
+                    ["avg_seconds"] = vaults.Count > 0 ? vaultSeconds / vaults.Count : 0,
+                    ["avg_loot"] = vaults.Count > 0 ? (double)vaultLoot / vaults.Count : 0
+                },
+                ["cost_estimated"] = true,
+                ["price_source"] = "maps.json",
+                ["notes"] = new JObject
+                {
+                    ["price"] = "物品价值按当前 maps.json 价格估算",
+                    ["cost"] = "日成本按每车地图数分摊，日盈亏为估算值；车次盈亏使用插件记录成本",
+                    ["vault"] = "宝物库时长按进入时间到最后一条掉落/层级事件估算",
+                    ["map"] = "地图类型：出货按物品归属；地图完成/魔纹按整车唯一地图类型归类"
+                }
+            }.ToString(Formatting.None);
         }
 
         // ============================================================
