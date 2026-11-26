@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // 控制。更改这些特性值可修改
 // 与程序集关联的信息。
 [assembly: AssemblyTitle("FF14TreasureHunterACT")]
-[assembly: AssemblyDescription("用于ACT的挖宝会计")]
+[assembly: AssemblyDescription("用于ACT的挖宝会计 | https://github.com/Heacter233/FF14TreasureHunterACT")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Heacter")]
 [assembly: AssemblyProduct("FF14TreasureHunterACT")]
